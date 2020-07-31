@@ -10,58 +10,56 @@ fse.ensureFileSync(dbPath);
 const sqlite3 = sq3.verbose();
 const db = new sqlite3.Database(dbPath);
 db.serialize(() => {
-  /**
-   * 物品表 GOODS
-   * name 品名
-   * standard_buy_unit_price 标准进价
-   * standard_sell_unit_price 标准售价
-   * total_amount 总金额
-   * total_count 总数量
-   * remark 备注
-   * create_time 创建时间
-   * update_time 修改时间
-   */
-  db.run(`CREATE TABLE GOODS(
-    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    standard_buy_unit_price DECIMAL(15,2) NOT NULL,
-    standard_sell_unit_price DECIMAL(15,2) NOT NULL,
-    total_amount DECIMAL(15,2) NOT NULL,
-    total_count DECIMAL(15,3) NOT NULL,
-    remark VARCHAR(255) NOT NULL,
-    create_time INTEGER NOT NULL,
-    update_time INTEGER NOT NULL
-    )`, err => {
-    logger(err);
-  });
 
-  /**
-   * 进出明细表 GOODS_DETAIL_LIST
-   * goods_id 物品id
-   * count 计数（+加 -减）
-   * actual_buy_unit_price 实际进价
-   * actual_sell_unit_price 实际售价
-   * amount 实际金额
-   * remark 备注
-   * latest 是否某物品最新一条记录（不是最新操作无法删除）（1是 0不是）
-   * create_time 创建时间
-   * update_time 修改时间
-   */
-  db.run(`CREATE TABLE GOODS_DETAIL_LIST(
+    // CREATE TABLE `x2test`.`xxx` ( 
+    // `id` INT NOT NULL AUTO_INCREMENT , 
+    // `id2` VARCHAR(200) NOT NULL , 
+    // `idx` INT NOT NULL , PRIMARY KEY (`id`), INDEX (`idx`), UNIQUE (`id2`)) ENGINE = InnoDB;
+    db.run(`CREATE TABLE ITEMS(
+      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      no VARCHAR(255),
+      area VARCHAR(255),
+      addr VARCHAR(255),
+      acceptor VARCHAR(255),
+      product_name VARCHAR(255),
+      product_type VARCHAR(255),
+      product_main VARCHAR(255),
+      action VARCHAR(255),
+      action_no VARCHAR(255) UNIQUE,
+      created VARCHAR(255),
+      status VARCHAR(255),
+      date_end VARCHAR(255),
+      user VARCHAR(255),
+      remark VARCHAR(255),
+      import_date VARCHAR(255)
+  )`, err => {
+        logger(err)
+    })
+
+
+    /**
+     * 结算规则表 package
+     */
+// db.run(`drop table package`)
+    db.run(`CREATE TABLE package(
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    goods_id INTEGER NOT NULL, 
-    count DECIMAL(15,3) NOT NULL,
-    actual_sell_unit_price DECIMAL(15,2) NOT NULL,
-    actual_buy_unit_price DECIMAL(15,2) NOT NULL,
-    amount DECIMAL(15,2) NOT NULL,
-    remark VARCHAR(255) NOT NULL,
-    latest INTEGER NOT NULL,
-    create_time INTEGER NOT NULL,
-    update_time INTEGER NOT NULL,
-    FOREIGN KEY (goods_id) REFERENCES GOODS(id)
+     name VARCHAR(255) NOT NULL,
+     type VARCHAR(255),
+     qudao VARCHAR(255),
+     heyue_id VARCHAR(255),
+     heyue_name VARCHAR(255),
+     taocan_id VARCHAR(255),
+     taocan_name VARCHAR(255),
+     yongjin VARCHAR(255),
+     yongjin_value VARCHAR(255),
+     yonghu_type VARCHAR(255),
+     jiesuan VARCHAR(255),
+     jiesuan_star VARCHAR(255),
+     jiesuan_month INTEGER NOT NULL,
+     jiesuan_desc VARCHAR(255)
     )`, err => {
-    logger(err);
-  });
+        logger(err);
+    });
 });
 
 export default db;

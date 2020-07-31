@@ -41,6 +41,16 @@ export default new Router({
             component: require('@/pages/history/index.vue').default
         },
         {
+            path: '/history/add',
+            name: 'history.add',
+            component: require('@/pages/history/add.vue').default
+        },
+        {
+            path: '/package',
+            name: 'package',
+            component: require('@/pages/package/index.vue').default
+        },
+        {
             path: '*',
             redirect: '/'
         }

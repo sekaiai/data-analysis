@@ -38,11 +38,9 @@
     }
 
 </style>
-
 <template>
     <aside>
-        <Menu ref="menu" @on-select="selectMenu"
-              theme="dark" width="100%" :active-name="activeMenuName" accordion class="layout-menu-left">
+        <Menu ref="menu" @on-select="selectMenu" theme="dark" width="100%" :active-name="activeMenuName" accordion class="layout-menu-left">
             <Menu-item v-for="(menu, index) in MENU" :name="menu.path" :key="index">
                 <Tooltip :content="menu.title" placement="right" :delay="800">
                     <Icon :type="menu.icon" :size="20"></Icon>
@@ -63,21 +61,12 @@
                 </DropdownMenu>
             </Dropdown>
         </div>
-        <Modal
-                v-model="modalShow"
-                title="关于">
+        <Modal v-model="modalShow" title="关于">
             <div class="aboutText">
-                <p><strong>easy-invoices {{version}}</strong></p>
-                <p>专注于桌面端单机版简易进销存业务，初心是帮助我父母提高工作效率。</p>
-                <p>该软件免费使用，并开源于<a href="javascript:void(0)"
-                                  @click="openUrl('https://github.com/CaanDoll/easy-invoices')">github</a>，目前只构建了windows版本。
-                </p>
-                <p>如果您有BUG反馈、意见或更好的建议，请联系我。</p>
-                <p>我的邮箱：<strong>caandoll@aliyun.com</strong></p>
+                <p><strong>version {{version}}</strong></p>
             </div>
             <div class="psText">
-                <p>PS：数据与配置文件存放在<a href="javascript:void(0)"
-                              @click="openPath(docDir)">{{docDir}}</a>下。若有重装系统等操作，请记得统一备份，并在重装后放至相同目录</p>
+                <p>PS：数据与配置文件存放在<a href="javascript:void(0)" @click="openPath(docDir)">{{docDir}}</a>下。若有重装系统等操作，请记得统一备份，并在重装后放至相同目录</p>
             </div>
             <div slot="footer">
                 <Button @click="modalShow = false">
@@ -85,61 +74,59 @@
                 </Button>
             </div>
         </Modal>
-
     </aside>
 </template>
-
 <script>
 import MENU from '../menu';
 import packageJson from '../../../package.json';
 import { docDir } from '../utils/settings';
 
 export default {
-  data() {
-    return {
-      MENU,
-      activeMenuName: '',
-      modalShow: false,
-      version: packageJson.version,
-      docDir,
-    };
-  },
-  methods: {
-    selectMenu(path) {
-      this.$router.push({ path });
+    data() {
+        return {
+            MENU,
+            activeMenuName: '',
+            modalShow: false,
+            version: packageJson.version,
+            docDir,
+        };
     },
-    dropMenuClick(name) {
-      switch (name) {
-        case 'update':
-          console.log('check update');
-          break;
-        case 'about':
-          this.modalShow = true;
-          break;
-        default:
-          null;
-      }
+    methods: {
+        selectMenu(path) {
+            this.$router.push({ path });
+        },
+        dropMenuClick(name) {
+            switch (name) {
+                case 'update':
+                    console.log('check update');
+                    break;
+                case 'about':
+                    this.modalShow = true;
+                    break;
+                default:
+                    null;
+            }
+        },
+        openUrl(url) {
+            this.$electron.shell.openExternal(url);
+        },
+        openPath(path) {
+            this.$electron.shell.openItem(path);
+        },
     },
-    openUrl(url) {
-      this.$electron.shell.openExternal(url);
+    watch: {
+        $route() {
+            this.activeMenuName = this.$route.path;
+            this.$nextTick(() => {
+                this.$refs.menu.updateActiveName();
+            });
+        },
     },
-    openPath(path) {
-      this.$electron.shell.openItem(path);
+    created() {
+        this.activeMenuName = this.$route.path;
+        this.$nextTick(() => {
+            this.$refs.menu.updateActiveName();
+        });
     },
-  },
-  watch: {
-    $route() {
-      this.activeMenuName = this.$route.path;
-      this.$nextTick(() => {
-        this.$refs.menu.updateActiveName();
-      });
-    },
-  },
-  created() {
-    this.activeMenuName = this.$route.path;
-    this.$nextTick(() => {
-      this.$refs.menu.updateActiveName();
-    });
-  },
 };
 </script>
