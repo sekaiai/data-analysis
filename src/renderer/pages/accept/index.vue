@@ -1,48 +1,36 @@
 <template>
     <div id="home">
-        <div class="title-line shrink0">数据筛选</div>
+        <div class="title-line shrink0">受理清单</div>
         <div class="flex">
             <div class="flex-item">
                 <div class="title">选择渠道名称</div>
-                <el-select v-model="addr" placeholder="选择渠道名称" filterable>
+                <el-select v-model="addr" placeholder="选择渠道名称" filterable @click.native="onFetchAddrs">
                     <el-option :label="v" :value="v" v-for="(v, i) in addrs" :key="i"></el-option>
-                </el-select>
-            </div>
-
-            <div class="flex-item">
-                <div class="title">选择受理人</div>
-                <el-select v-model="acceptor" placeholder="选择受理人" filterable>
-                    <el-option :label="v" :value="v" v-for="(v, i) in acceptors" :key="i"></el-option>
                 </el-select>
             </div>
             <!-- 产品名称 -->
             <div class="flex-item">
                 <div class="title">选择产品名称</div>
-                <el-select
-                    v-model="product_name"
-                    placeholder="选择产品名称"
-                    @click.native="onFetchProductName"
-                    filterable
-                >
+                <el-select v-model="product_name" placeholder="选择产品名称" @click.native="onFetchProductName" filterable>
                     <el-option :label="v" :value="v" v-for="(v, i) in product_names" :key="i"></el-option>
                 </el-select>
             </div>
             <!-- 产品名称 -->
             <div class="flex-item">
                 <div class="title">选择所属主销售品</div>
-                <el-select
-                    v-model="product_main"
-                    placeholder="选择所属主销售品"
-                    filterable
-                    @click.native="onFetchProductMain"
-                >
+                <el-select v-model="product_main" placeholder="选择所属主销售品" filterable @click.native="onFetchProductMain">
                     <el-option :label="v" :value="v" v-for="(v, i) in product_mains" :key="i"></el-option>
                 </el-select>
             </div>
-
+            <div class="flex-item">
+                <div class="title">选择受理人</div>
+                <el-select v-model="acceptor" placeholder="选择受理人" filterable @click.native="onFetchAcceptor">
+                    <el-option :label="v" :value="v" v-for="(v, i) in acceptors" :key="i"></el-option>
+                </el-select>
+            </div>
             <div class="flex-item">
                 <div class="title">选择揽件人</div>
-                <el-select v-model="user" placeholder="选择揽件人" filterable>
+                <el-select v-model="user" placeholder="选择揽件人" filterable @click.native="onFetchUser">
                     <el-option :label="v" :value="v" v-for="(v, i) in users" :key="i"></el-option>
                 </el-select>
             </div>
@@ -60,44 +48,28 @@
                     <el-option :label="v" :value="v" v-for="(v, i) in actions" :key="i"></el-option>
                 </el-select>
             </div> -->
-
             <!-- 业务号码 -->
             <div class="flex-item">
                 <div class="title">业务号码</div>
-                <el-input v-model="action_no" placeholder="业务号码，可输入部分" />
+                <el-input v-model="action_no" placeholder="可输入部分" />
             </div>
             <!-- 受理时间  -->
             <div class="flex-item">
                 <!-- 请选择受理时间 -->
                 <div class="title">请选择受理时间</div>
-                <el-date-picker
-                    v-model="created"
-                    type="daterange"
-                    align="right"
-                    unlink-panels
-                    range-separator="至"
-                    start-placeholder="开始日期"
-                    end-placeholder="结束日期"
-                    :picker-options="pickerOptions"
-                >
+                <!--                <el-date-picker v-model="created" type="daterange" align="right" unlink-panels range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" :picker-options="pickerOptions">
+                </el-date-picker> -->
+                <el-date-picker v-model="created" type="month" placeholder="选择月">
                 </el-date-picker>
             </div>
             <!-- 竣工时间  -->
             <div class="flex-item">
                 <div class="title">请选择竣工时间</div>
-                <!-- 请选择受理时间 -->
-                <el-date-picker
-                    v-model="date_end"
-                    type="daterange"
-                    align="right"
-                    unlink-panels
-                    range-separator="至"
-                    start-placeholder="开始日期"
-                    end-placeholder="结束日期"
-                    :picker-options="pickerOptions"
-                >
+                <el-date-picker v-model="date_end" type="month" placeholder="选择月">
                 </el-date-picker>
-
+                <!-- 请选择受理时间 -->
+                <!--      <el-date-picker v-model="date_end" type="daterange" align="right" unlink-panels range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" :picker-options="pickerOptions">
+                </el-date-picker> -->
                 <!-- <el-date-picker
                     v-model="date_end"
                     type="date"
@@ -108,35 +80,18 @@
                 >
                 </el-date-picker> -->
             </div>
-
             <div class="flex-item">
                 <div class="title">操作</div>
-
                 <el-button @click="handleSearch" type="primary">查询</el-button>
                 <el-button @click="handleSearch(`clear`)" type="default">清除</el-button>
             </div>
         </div>
         <div class="title-line shrink0">
             数据列表
-            <small
-                >共有<b>{{ total }}</b
-                >条数据</small
-            >
-            <el-button style="margin-left: 20px;" @click="$router.push(`/history/add`)" type="primary" size="mini"
-                >新增受理清单</el-button
-            >
-
-            <el-button
-                style="margin-left: 10px;"
-                type="success"
-                :loading="outputLoading"
-                @click="handleOutputDatas"
-                size="mini"
-                >导出查询结果</el-button
-            >
-            <el-button style="margin-left: 10px;" :loading="deleteLoading" @click="handleDeleteDatas" size="mini"
-                >清除查询结果(删除本地数据)</el-button
-            >
+            <small>共有<b>{{ total }}</b>条数据</small>
+            <el-button style="margin-left: 20px;" @click="$router.push(`/accept/add`)" type="primary" size="mini">新增受理清单</el-button>
+            <el-button style="margin-left: 10px;" type="success" :loading="outputLoading" @click="handleOutputDatas" size="mini">导出查询结果</el-button>
+            <el-button style="margin-left: 10px;" :loading="deleteLoading" @click="handleDeleteDatas" size="mini">清除查询结果(删除本地数据)</el-button>
         </div>
         <div class="table-box flex1" ref="tableBox">
             <el-table :data="datas" :height="tableHeight" v-if="tableHeight">
@@ -146,30 +101,32 @@
                             <el-form-item label="购物车流水号">
                                 <span>{{ props.row.no }}</span>
                             </el-form-item>
-
-                            <el-form-item label="受理人">
-                                <span>{{ props.row.acceptor }}</span>
+                            <el-form-item label="地区">
+                                <span>{{ props.row.area }}</span>
                             </el-form-item>
                             <el-form-item label="业务动作">
                                 <span>{{ props.row.action }}</span>
                             </el-form-item>
-
+                            <el-form-item label="受理人">
+                                <span>{{ props.row.acceptor }}</span>
+                            </el-form-item>
+                            <el-form-item label="角色名称">
+                                <span>{{ props.row.product_type }}</span>
+                            </el-form-item>
                             <el-form-item label="受理时间">
                                 <span>{{ props.row.created | parseDate }}</span>
                             </el-form-item>
                             <el-form-item label="工单状态">
                                 <span>{{ props.row.status }}</span>
                             </el-form-item>
-
-                            <el-form-item label="竣工时间">
-                                <span>{{ props.row.date_end | parseDate }}</span>
+                            <el-form-item label="产品名称">
+                                <span>{{ props.row.product_name }}</span>
                             </el-form-item>
-
                             <el-form-item label="揽收人">
                                 <span>{{ props.row.user }}</span>
                             </el-form-item>
                             <el-form-item label="导入时间">
-                                <span>{{ props.row.import_date }}</span>
+                                <span>{{ props.row.import_date| parseDate }}</span>
                             </el-form-item>
                             <el-form-item label="备注">
                                 <span>{{ props.row.remark || '-' }}</span>
@@ -178,26 +135,20 @@
                     </template>
                 </el-table-column>
                 <el-table-column prop="action_no" label="业务号码"> </el-table-column>
-                <el-table-column prop="product_name" label="产品名称"> </el-table-column>
-                <el-table-column prop="product_type" label="角色名称"> </el-table-column>
                 <el-table-column prop="product_main" label="所属主销售品"> </el-table-column>
-                <el-table-column prop="area" label="地区"> </el-table-column>
                 <el-table-column prop="addr" label="渠道名称"> </el-table-column>
-
+                <el-table-column prop="js_count" label="已结算次数"> </el-table-column>
+                <el-table-column prop="status" label="工单状态"> </el-table-column>
+                <el-table-column prop="date_end" label="竣工时间">
+                    <template slot-scope="scope">
+                        {{ scope.row.date_end | parseDate}}
+                    </template>
+                </el-table-column>
                 <!--     <el-table-column v-for="(v, i) in items" :prop="i" :label="v"> </el-table-column> -->
                 <!-- <el-table-column prop="no" label="购物车流水号"> </el-table-column> -->
             </el-table>
         </div>
-        <el-pagination
-            class="pagination shrink0"
-            @current-change="handleCurrentChange"
-            :hide-on-single-page="true"
-            background
-            layout="prev, pager, next"
-            :current-page.sync="page"
-            :total="total"
-            :page-size="20"
-        >
+        <el-pagination class="pagination shrink0" @current-change="handleCurrentChange" :hide-on-single-page="true" background layout="prev, pager, next" :current-page.sync="page" :total="total" :page-size="20">
         </el-pagination>
     </div>
 </template>
@@ -219,8 +170,7 @@ export default {
             fileList: [],
             datas: [],
             pickerOptions: {
-                shortcuts: [
-                    {
+                shortcuts: [{
                         text: '最近一周',
                         onClick(picker) {
                             const end = new Date()
@@ -288,36 +238,56 @@ export default {
     },
     filters: {
         parseDate(v) {
-            let date = new Date(v * 1)
-            console.log(v, date)
-            return `${date.getFullYear()}年${date.getMonth() +
-                1}月${date.getDay()}日 ${date.getHours()}时${date.getMinutes()}分${date.getSeconds()}秒`
+            return dayjs(v * 1000).format('YYYY-MM-DD hh:ss:mm')
+            // let date = new Date(v * 1)
+            // console.log(v, date)
+            // return `${date.getFullYear()}年${date.getMonth() +
+            //     1}月${date.getDay()}日 ${date.getHours()}时${date.getMinutes()}分${date.getSeconds()}秒`
         }
     },
     created() {
         this.onFetchDatas()
         this.onFetchCount()
-        this.onFetchQudao()
-        this.onFetchAcceptor()
-        this.onFetchUser()
+        // this.onFetchQudao()
+        // this.onFetchAcceptor()
+        // this.onFetchUser()
     },
     methods: {
+        onFetchUser() {
+            // 查询揽件人
+            if (!this.acceptor.length) {
+                if (!this.users.length) this.remoteMethod('user')
+            }
+
+        },
+
+        onFetchAcceptor() {
+            if (!this.acceptors.length) {
+                if (!this.acceptors.length) this.remoteMethod('acceptor')
+                // 查询受理人
+            }
+
+        },
+        onFetchAddrs() {
+            console.log('hhhh')
+            if (!this.addrs.length) this.onFetchQudao()
+
+        },
         onFetchProductMain() {
-            if (!this.product_mains.length) this.remoteMethod('product_name')
+            if (!this.product_mains.length) this.remoteMethod('product_main')
         },
         onFetchProductName() {
             if (!this.product_names.length) this.remoteMethod('product_name')
         },
         handleDeleteDatas() {
             this.$confirm(
-                '删除前先点查询确认下是否是要删除的数据，该操作会删除所选条件下的所有数据且不可恢复。',
-                '提示',
-                {
-                    confirmButtonText: '确定',
-                    cancelButtonText: '取消',
-                    type: 'warning'
-                }
-            )
+                    '删除前先点查询确认下是否是要删除的数据，该操作会删除所选条件下的所有数据且不可恢复。',
+                    '提示', {
+                        confirmButtonText: '确定',
+                        cancelButtonText: '取消',
+                        type: 'warning'
+                    }
+                )
                 .then(() => {
                     let where = this.onParseSearchSQL()
                     console.log({ where })
@@ -330,7 +300,7 @@ export default {
                     }
                     this.deleteLoading = true
 
-                    const sql = `delete from ITEMS ${where}`
+                    const sql = `delete from accept ${where}`
                     this.$db.run(sql, (err, res) => {
                         console.log(err, res)
                         this.deleteLoading = false
@@ -351,8 +321,8 @@ export default {
             if (this[`${key}s`].length) {
                 return
             }
-            console.log('所属主销售品')
-            const sql = `select ${key} as val from ITEMS group by ${key}`
+            console.log({ key })
+            const sql = `select ${key} as val from accept group by ${key}`
             this.$db.all(sql, (err, res) => {
                 if (err) {
                     console.log(err)
@@ -388,12 +358,19 @@ export default {
 
             // 查询开始结束
             if (this.created) {
-                let [a, b] = this.created
-                where.push(`created between ${a.getTime()} and ${b.getTime()}`)
+                let date = this.created
+
+                let a = dayjs(date).startOf('month').unix()
+                let b = dayjs(date).endOf('month').unix()
+                console.log(a, b)
+                where.push(`created between ${a} and ${b}`)
             }
             if (this.date_end) {
-                let [a, b] = this.date_end
-                where.push(`date_end between ${a.getTime()} and ${b.getTime()}`)
+                let date = this.date_end
+
+                let a = dayjs(date).startOf('month').unix()
+                let b = dayjs(date).endOf('month').unix()
+                where.push(`date_end between ${a} and ${b}`)
             }
             // const a = false && this.created && this.created.getTime()
             // const b = false && this.date_end && this.date_end.getTime()
@@ -483,35 +460,10 @@ export default {
             console.log(datas)
             return datas
         },
-        onFetchUser() {
-            // 查询揽件人
-            const sql = `select user from ITEMS group by user`
-            this.$db.all(sql, (err, res) => {
-                if (err) {
-                    console.log(err)
-                } else {
-                    console.log(res)
-                    // this.dataListTotalCount = res.totalCount;
-                    this.users = res.map(e => e.user).filter(e => e)
-                }
-            })
-        },
-        onFetchAcceptor() {
-            // 查询受理人
-            const sql = `select acceptor from ITEMS group by acceptor`
-            this.$db.all(sql, (err, res) => {
-                if (err) {
-                    console.log(err)
-                } else {
-                    console.log(res)
-                    // this.dataListTotalCount = res.totalCount;
-                    this.acceptors = res.map(e => e.acceptor)
-                }
-            })
-        },
+
         onFetchQudao() {
             // 查询渠道
-            const sql = `select addr from ITEMS group by addr`
+            const sql = `select addr from accept group by addr`
             this.$db.all(sql, (err, res) => {
                 if (err) {
                     console.log(err)
@@ -523,7 +475,7 @@ export default {
             })
         },
         onFetchCount(whereSQL = '') {
-            const sql = 'SELECT COUNT(id) AS totalCount from ITEMS ' + whereSQL
+            const sql = 'SELECT COUNT(id) AS totalCount from accept ' + whereSQL
             this.$db.get(sql, (err, res) => {
                 if (!err) {
                     this.total = res.totalCount
@@ -533,7 +485,7 @@ export default {
         onFetchDatas(whereSQL = '', limit = 20) {
             console.log({ page: this.page })
             limit = limit ? `limit ${this.limit * (this.page - 1)}, ${this.limit}` : ''
-            const sql = `select * from ITEMS ${whereSQL} ${limit}`
+            const sql = `select * from accept ${whereSQL} ${limit}`
 
             console.log(sql)
             return new Promise((resolve, reject) => {
@@ -557,6 +509,7 @@ export default {
 .line2 {
     padding-top: 10px;
 }
+
 .flex-item {
     .title {
         font-size: 12px;

@@ -3,11 +3,11 @@
         <el-menu class="menu-vertical" default-active="1" :router="true" :collapse="true" background-color="#545c64">
             <el-menu-item index="1">
                 <i class="el-icon-menu"></i>
-                <span slot="title">数据分析</span>
+                <span slot="title">结算分析</span>
             </el-menu-item>
-            <el-menu-item index="2" :route="{ name: 'history' }">
+            <el-menu-item index="2" :route="{ name: 'accept' }">
                 <i class="el-icon-document"></i>
-                <span slot="title">历史数据</span>
+                <span slot="title">受理清单</span>
             </el-menu-item>
             <el-menu-item index="3" :route="{ name: 'package' }">
                 <i class="el-icon-s-cooperation"></i>

@@ -36,14 +36,19 @@ export default new Router({
             component: require('@/pages/home/index.vue').default
         },
         {
-            path: '/history',
-            name: 'history',
-            component: require('@/pages/history/index.vue').default
+            path: '/bill/list',
+            name: 'bill.list',
+            component: require('@/pages/home/list.vue').default
         },
         {
-            path: '/history/add',
-            name: 'history.add',
-            component: require('@/pages/history/add.vue').default
+            path: '/accept',
+            name: 'accept',
+            component: require('@/pages/accept/index.vue').default
+        },
+        {
+            path: '/accept/add',
+            name: 'accept.add',
+            component: require('@/pages/accept/add.vue').default
         },
         {
             path: '/package',
