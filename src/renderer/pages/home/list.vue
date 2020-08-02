@@ -81,7 +81,7 @@
                 </el-table>
             </template>
         </div>
-        <el-pagination class='pagination' @current-change='handleCurrentChange' :hide-on-single-page="false" background layout="prev, pager, next" :current-page.sync='page' :total="total">
+        <el-pagination class='pagination' @current-change='handleCurrentChange' :hide-on-single-page="false" background layout="prev, pager, next" :current-page.sync='page' :total="total" :page-size="20">
         </el-pagination>
     </div>
 </template>
@@ -162,6 +162,9 @@ export default {
             if (this.not_found_user !== '') {
                 where.push(`not_found_user = 1`)
             }
+            if (this.package_name !== '') {
+                where.push(`package_name = '${this.package_name}'`)
+            }
 
             // 查询开始结束
             if (this.branch) {
@@ -209,7 +212,10 @@ export default {
             this.onFetchDatasCount()
         },
         onFetchProductMain() {
-            const sql = `select package_name as val from accept group by package_name`
+            if (this.package_name_arr.length > 0) {
+                return
+            }
+            const sql = `select package_name as val from bill group by package_name`
             this.$db.all(sql, (err, res) => {
                 if (err) {
                     console.log(err)
@@ -217,7 +223,7 @@ export default {
                     console.log(res)
                     // this.dataListTotalCount = res.totalCount;
                     const data = res.map(e => e.val).filter(e => e)
-                    this.$set(this, `${key}_arr`, data)
+                    this.$set(this, `package_name_arr`, data)
                 }
             })
         }
