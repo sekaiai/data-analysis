@@ -95,7 +95,9 @@
             >
         </p> -->
         <div>
-            <el-button type="success" @click="handleUpdate">更新数据</el-button>
+            <el-button type="success" @click="handleUpdate" :loading="uploadloading">
+                重新统计{{ uploadloading ? '中...' : '数据' }}
+            </el-button>
             <el-button type="default" @click="onRouterList">查看历史数据</el-button>
         </div>
     </div>
@@ -110,6 +112,7 @@ const fs = require('fs')
 export default {
     data() {
         return {
+            uploadloading: false, //重新统计的加载按钮
             monthInsertSuccessCount: 0, //当月插入成功数
             monthInsertErrorCount: 0, //当月插入失败数
             notFoundUserCount: 0, //没有找到受理用户的结算清单
@@ -215,7 +218,64 @@ export default {
             this.$router.push({ name: 'bill.list', query })
         },
         handleUpdate() {
+            this.$confirm('该操作会根据现有的结算清单重新统计受理表的结算次数和副卡信息。', '提示', {
+                confirmButtonText: '确定',
+                cancelButtonText: '取消',
+                type: 'warning'
+            })
+                .then(() => {
+                    this.onUpdate()
+                })
+                .catch(() => {})
+        },
+        async onUpdate() {
+            this.uploadloading = true
             // 更新所有数据
+            const sql = `select user_number,count(user_number) as count from bill group by user_number`
+            const bills = await new Promise(resolve => {
+                this.$db.all(sql, (err, res = []) => {
+                    // this.$logger(err, res)
+                    // let _sql = ``
+                    resolve(res)
+                })
+            })
+            for (var i = 0; i < bills.length; i++) {
+                let item = bills[i]
+                // 1. 先查询
+                let hasdata = await new Promise(resolve => {
+                    const _sql = `select action_no from accept where action_no=${item.user_number}`
+
+                    this.$db.get(_sql, (err, res) => {
+                        this.$logger('111hasdata', res)
+                        resolve(res)
+                    })
+                })
+                this.$logger('222hasdata', hasdata)
+                if (hasdata) {
+                    // 插入数据
+                    let _sql = `update accept set js_count = ${item.count} where action_no = ${item.user_number}`
+                    this.$db.run(_sql, (err, res) => {
+                        this.$logger('update data', { res, err })
+                    })
+                } else {
+                    // 从关联表查询
+
+                    let _sql = `select a1 from related_user where a2='${item.user_number}' or a3='${item.user_number}' or a4='${item.user_number}' or a5='${item.user_number}' or a6='${item.user_number}'`
+                    this.$db.get(_sql, (err, res) => {
+                        this.$logger('related_user', { err, res })
+                        if (res) {
+                            let _sql = `update accept set js_count=${item.count},user_number='${item.user_number}' where action_no = '${res.a1}'`
+                            this.$db.run(_sql, (err, res) => {
+                                this.$logger('update related_user', { err, res })
+                            })
+                        }
+                    })
+                }
+            }
+            this.uploadloading = false
+            // 更新完以后重新获取分析信息
+            //
+            this.onFetchPackageDatas()
         },
         onRouterList() {
             this.$router.push('/bill/list')
@@ -223,14 +283,16 @@ export default {
         handleClearData() {
             // 清空数据库
             this.$db.run(`delete from bill where id > 0`, (err, res) => {
-                console.log({ err, res })
+                this.$logger({ err, res })
             })
         },
         // 获取本月待计算受理数
         onFetchPackageDatas() {
+            this.accept_count = 0
+            this.accept_length = 0
             const sql = 'select * from package'
             this.$db.all(sql, (err, res) => {
-                console.log(err, res)
+                this.$logger(err, res)
                 if (!err) {
                     this.package = res
                     this.onFetchSettle(res)
@@ -264,15 +326,15 @@ export default {
             let accept_arr = []
             for (var i = vals.length - 1; i >= 0; i--) {
                 let { name, count } = vals[i]
-                // console.log(name, count)
+                // this.$logger(name, count)
                 // a.date_end,a.js_count
                 const sql = `select a.* from accept as a where a.js_count < ${count} and product_main='${name}'`
                 const data = await new Promise(resolve => {
                     this.$db.all(sql, (err, res = []) => {
                         if (!err) {
-                            // console.log({ vals }, i)
+                            // this.$logger({ vals }, i)
                             resolve(res)
-                            // console.log(day, now, law, count)
+                            // this.$logger(day, now, law, count)
                         } else {
                             resolve([])
                         }
@@ -287,12 +349,12 @@ export default {
                     this.onCalcCount(vals[i], data)
                 }
             }
-            console.log({ accept_arr })
+            this.$logger({ accept_arr })
             return accept_arr
         },
         async onCalcCountColums(item, vals) {
             // 统计本月需要计算的数量
-            // console.log({ item })
+            // this.$logger({ item })
             let accept_count_arr = []
             let { name, count, law, id } = item
 
@@ -302,14 +364,14 @@ export default {
             law = law.toString().split(',')
             law.length = count
             law = Array.from(law).map(e => e | 0 || 1)
-            console.log({ law })
+            this.$logger({ law })
             let result = 0 //总结算次数
             let __nums = 0 //总结算清单数
 
             // count 导出有月份的清单
             let __flag = this.outputLoading === 'accept_count'
             // 重置一下
-            console.log({ vals })
+            this.$logger({ vals })
             try {
                 for (let i = 0; i < vals.length; i++) {
                     let e = vals[i]
@@ -347,19 +409,19 @@ export default {
                     e.date_end = dayjs.unix(e.date_end).format('YYYY-MM-DD hh:ss:mm')
 
                     if (__flag) {
-                        // console.log('找出结算成功的数据 __count', __count)
+                        // this.$logger('找出结算成功的数据 __count', __count)
                         if (__count.length) {
                             // 找出结算成功的数据
                             let sql = `select date from bill where user_number='${e.action_no}' and status=1`
 
                             const qd = await new Promise(resolve => {
                                 this.$db.all(sql, (err, res) => {
-                                    // console.log('找出结算成功的数据', sql, res)
+                                    // this.$logger('找出结算成功的数据', sql, res)
 
                                     if (!err) {
-                                        // console.log({ vals }, i)
+                                        // this.$logger({ vals }, i)
                                         resolve(res.map(e => e.date * 1))
-                                        // console.log(day, now, law, count)
+                                        // this.$logger(day, now, law, count)
                                     } else {
                                         resolve([])
                                     }
@@ -368,7 +430,7 @@ export default {
                             // 筛选出已存在的
                             __count = __count.filter(e => !qd.includes(e * 1))
 
-                            // console.log('找出结算成功的数据', qd, __count)
+                            // this.$logger('找出结算成功的数据', qd, __count)
                             accept_count_arr.push(
                                 ...__count.map(e2 => {
                                     e.date = e2
@@ -386,14 +448,14 @@ export default {
                     }
                 }
             } catch (err) {
-                console.log(err)
+                this.$logger(err)
             }
 
             return accept_count_arr
         },
         onCalcCount(item, vals) {
             // 统计本月需要计算的数量
-            // console.log({ item })
+            // this.$logger({ item })
             let { name, count, law, id } = item
 
             const now = dayjs().format('YYYYMM')
@@ -402,7 +464,7 @@ export default {
             law = law.toString().split(',')
             law.length = count
             law = Array.from(law).map(e => e | 0 || 1)
-            console.log({ law })
+            this.$logger({ law })
             let result = 0 //总结算次数
             let __nums = 0 //总结算清单数
 
@@ -440,7 +502,7 @@ export default {
             })
             // 获取当前查询套餐的INDEX
             const idx = this.datas.findIndex(e => e.id == id)
-            console.log({ result, len: vals.length, idx })
+            this.$logger({ result, len: vals.length, idx })
             this.accept_count += result
             this.accept_length += __nums
             // this.$set(this.datas[idx], '__count', result)
@@ -453,7 +515,7 @@ export default {
             // 本月需要处理的受理清单
             // flag = 'accept_count', 'accept_length'
             // 获取受理清单
-            console.log({ flag })
+            this.$logger({ flag })
             try {
                 let accept_count_arr = []
                 if (this.package.length) {
@@ -462,7 +524,7 @@ export default {
                 } else {
                     return
                 }
-                console.log({ accept_count_arr })
+                this.$logger({ accept_count_arr })
 
                 let __flag = flag === 'accept_count'
 
@@ -493,7 +555,7 @@ export default {
             }
         },
         async handleAnalysisDownload(type) {
-            console.log('handleAnalysisDownload', type)
+            this.$logger('handleAnalysisDownload', type)
             let title = ''
             let datas = []
             if (type === 'insertError') {
@@ -506,7 +568,7 @@ export default {
                 const sql = `select * from bill where not_found_user = 1`
                 datas = await new Promise(resolve => {
                     this.$db.run(sql, (err, res) => {
-                        console.log('onNotFoundUserMember', { err, res })
+                        this.$logger('onNotFoundUserMember', { err, res })
                         resolve(res || [])
                     })
                 })
@@ -532,7 +594,7 @@ export default {
             // 下载
             const name = `[${title}]`
             const book_name = 'book_name'
-            console.log(datas)
+            this.$logger(datas)
 
             this.onDownload(datas, name)
         },
@@ -541,7 +603,7 @@ export default {
                 .excel2(datas, name, book_name, excelType)
                 .then(res => {
                     this.outputLoading = ''
-                    console.log(res)
+                    this.$logger(res)
                     this.$message({
                         showClose: true,
                         message: `数据表格创建${!res ? '成功' : '失败'}`,
@@ -550,7 +612,7 @@ export default {
                 })
                 .catch(err => {
                     this.outputLoading = ''
-                    console.log(err)
+                    this.$logger(err)
                 })
         },
         parseAoaData(datas, json = '') {
@@ -558,11 +620,11 @@ export default {
 
             const line1 = Object.values(json || this.notfoundItems)
             const keys = Object.keys(json || this.notfoundItems)
-            // console.log(line1, keys)
-            // console.log(datas)
+            // this.$logger(line1, keys)
+            // this.$logger(datas)
             datas = datas.map(v => {
                 return keys.map(k => {
-                    console.log({ k })
+                    this.$logger({ k })
                     if (k === 'error') {
                         if (/UNIQUE/i.test(v[k])) {
                             return '数据已存在'
@@ -572,7 +634,7 @@ export default {
                 })
             })
             datas.unshift(line1)
-            // console.log(datas)
+            // this.$logger(datas)
             return datas
         },
         parseJsonData() {
@@ -580,7 +642,7 @@ export default {
         },
         onChange(e) {
             // 文件发生变化
-            console.log('onChange', e)
+            this.$logger('onChange', e)
         },
         submitUpload() {
             let fileList = this.$electron.remote.dialog.showOpenDialog({
@@ -613,7 +675,7 @@ export default {
                 this.success = json
             } else {
                 this.errors = json
-                console.log({ json })
+                this.$logger({ json })
             }
         },
         onOpenFile(path, i) {
@@ -635,7 +697,7 @@ export default {
                 let json = xlsx.utils.sheet_to_json(result.Sheets[key])
 
                 json = json.map(e => {
-                    console.log(e)
+                    this.$logger(e)
                     let obj = {}
                     for (let k in this.columns) {
                         let v = this.columns[k]
@@ -660,11 +722,11 @@ export default {
                 if (key === '成功' || key === '失败') {
                     // if (key === '成功') {
                     // } else if (key === '失败') {
-                    //     // console.log({ json })
+                    //     // this.$logger({ json })
                     // }
                     _data.push(...json)
                 }
-                // console.log({ json })
+                // this.$logger({ json })
             })
 
             // 分析未找到数据
@@ -698,10 +760,10 @@ export default {
             let values = Object.values(datas).join(`','`)
             // 插入数据库
             const sql = `insert into bill (${keys}) values ('${values}')`
-            // console.log(sql)
+            // this.$logger(sql)
             this.$db.run(sql, err => {
                 if (err) {
-                    console.log(err)
+                    this.$logger(err)
                     datas.error = err.toString()
                     this.insertError.push(datas)
                 } else {
@@ -712,11 +774,11 @@ export default {
                     const sql = `update accept set js_count=js_count+1 where action_no='${id}' or user_number='${id}'`
                     this.$db.run(sql, err => {
                         if (err) {
-                            console.log(id, '更新js_count失败')
+                            this.$logger(id, '更新js_count失败')
                             // 判断数据是否在副卡中
                             const sql2 = `select a1 from related_user where a2='${id}' or a3='${id}' or a4='${id}' or a5='${id}' or a6='${id}'`
                             this.$db.get(sql2, (err, res) => {
-                                console.log(id, '查找副卡', res, err)
+                                this.$logger(id, '查找副卡', res, err)
 
                                 if (err) {
                                     // 不在副卡中就标记为未找到受理用户
@@ -724,9 +786,9 @@ export default {
                                 } else {
                                     // 找到就更新结算条数, js_count
                                     const sql = `update accept set js_count=js_count+1, user_number='${id}' where action_no='${res.a1}'`
-                                    console.log('添加绑定副卡', res, sql)
+                                    this.$logger('添加绑定副卡', res, sql)
                                     this.$db.run(sql, err => {
-                                        // console.log(err)
+                                        // this.$logger(err)
                                         if (err) {
                                             this.onNotFoundUserMember(datas)
                                         }
@@ -742,20 +804,20 @@ export default {
             this.notFoundUserMember.push(datas)
             const sql = `update bill set not_found_user = 1 where user_number = '${datas.user_number}' `
             this.$db.run(sql, (err, res) => {
-                console.log('onNotFoundUserMember', { err, res })
+                this.$logger('onNotFoundUserMember', { err, res })
             })
         },
         handleParseLose() {
             let user = this.datas.map(e => e['user_number']).join(`','`)
             user = `'${user}'`
-            console.log({ user })
+            this.$logger({ user })
             // 1.获取所有数据，然后再从user中未找到accept中不存在的数据
 
             // 查询未找到的数据
             const sql = `select * from accept where action_no  in (${user})`
             this.$db.all(sql, (err, res) => {
-                console.log({ err })
-                console.log(res)
+                this.$logger({ err })
+                this.$logger(res)
 
                 // {
                 //                 no: '购物车流水号',
@@ -779,7 +841,7 @@ export default {
             })
         },
         handleAnalysisClick(e) {
-            console.log(e)
+            this.$logger(e)
             // 数据分析tab点击事件
         }
     }

@@ -71,7 +71,7 @@ export default {
       const sql = `select * from related_user limit ${star},${this.limit}`
 
       this.$db.all(sql, (err, res = []) => {
-        console.log(err, res)
+        this.$logger(err, res)
         this.datas = res
       })
     },
@@ -133,11 +133,11 @@ export default {
         // _datas = _datas.forEach(e => {
         if (e && e['业务号码']) {
           let vals = values.map(k => e[k]).join(`','`)
-          // console.log(vals)
+          // this.$logger(vals)
           const sql = `INSERT INTO related_user (${keys}) values ('${vals}')`
           await new Promise(reslove => {
             this.$db.run(sql, (err, res) => {
-              // console.log({ err, res })
+              // this.$logger({ err, res })
               if (!err) {
                 this.countSuccess++
               } else {
@@ -155,7 +155,7 @@ export default {
         title: '提示',
         message: `写入成功${this.countSuccess}, 写入失败${this.countError}`
       })
-      // console.log(_datas)
+      // this.$logger(_datas)
       // this.datas.push(..._datas)
     }
   }

@@ -143,9 +143,9 @@ export default {
 
             this.$db.get(sql, (err, res) => {
                 if (err) {
-                    console.log(err)
+                    this.$logger(err)
                 } else {
-                    console.log(res)
+                    this.$logger(res)
                     this.monthLength = res.count
                     // this.dataListTotalCount = res.totalCount;
                 }
@@ -159,7 +159,7 @@ export default {
         },
         handleTabsChange(e) {
             // tabs 切换
-            console.log(e)
+            this.$logger(e)
         },
         handleAnalysisDownload(type) {
             // const type = this.analysisActiveName
@@ -179,12 +179,12 @@ export default {
             } else if (type === 'error') {
                 txt = '写入失败（已存在）'
             }
-            console.log(type, datas)
-            console.log('handleAnalysisDownload')
+            this.$logger(type, datas)
+            this.$logger('handleAnalysisDownload')
 
             const name = `[${txt}]`
             const book_name = 'book_name'
-            console.log(datas)
+            this.$logger(datas)
 
             download.excel2(datas, name, book_name, 'json')
 
@@ -201,13 +201,13 @@ export default {
         parseAoaData(datas) {
             const line1 = Object.values(this.items)
             const keys = Object.keys(this.items)
-            console.log({ line1, keys })
-            console.log({ datas })
+            this.$logger({ line1, keys })
+            this.$logger({ datas })
             datas = datas.map(v => {
                 return keys.map(k => v[k])
             })
             datas.unshift(line1)
-            console.log(datas)
+            this.$logger(datas)
             return datas
         },
 
@@ -231,10 +231,10 @@ export default {
             }
             this.loading = true
             setTimeout(() => {
-                console.log('loading', this.loading)
+                this.$logger('loading', this.loading)
                 this.logs.push(`选取${fileList.length}张数据表, 开始解析`)
 
-                console.log(fileList)
+                this.$logger(fileList)
                 fileList.forEach((e, i) => {
                     try {
                         this.onOpenFile(e, i)
@@ -272,7 +272,7 @@ export default {
                 cellHTML: false
             })
 
-            console.log('TCL: result', result)
+            this.$logger('TCL: result', result)
 
             let _datas = xlsx.utils.sheet_to_json(result.Sheets[result.SheetNames[0]])
 
@@ -293,8 +293,8 @@ export default {
             return new Promise(resolve => {
                 this.$db.run(sql, err => {
                     if (err) {
-                        console.log(err)
-                        // console.log()
+                        this.$logger(err)
+                        // this.$logger()
                         // 遇到相同的
                         // 1. 查询出结果。
                         // 2. 对照业务动作，新装的则保留新装
@@ -304,24 +304,24 @@ export default {
                         keys.split(',').forEach((e, i) => {
                             values[e] = item[i]
                         })
-                        console.log({ values })
+                        this.$logger({ values })
                         // const action = item[idx]
                         let ssql = `select * from accept where action_no = '${values.action_no}'`
                         this.$db.get(ssql, (err, res) => {
-                            console.log({ res, err })
+                            this.$logger({ res, err })
                             if (res) {
                                 if ((values.action == '新装' && res.no !== values.no) || values.created < res.created) {
                                     let dsql = `delete from accept where action_no = '${values.action_no}'`
                                     this.$db.run(dsql, (err, res) => {
                                         if (!err) {
                                             this.$db.run(sql, (err, res) => {
-                                                console.log('该插入成功', { err, res })
+                                                this.$logger('该插入成功', { err, res })
                                             })
                                         }
-                                        console.log('删除数据', { err, res })
+                                        this.$logger('删除数据', { err, res })
                                     })
                                 } else {
-                                    console.log('数据相同他')
+                                    this.$logger('数据相同他')
                                 }
                             }
                         })
@@ -344,7 +344,7 @@ export default {
                 item = values.map(e => {
                     if (e == '受理时间' || e == '竣工时间') {
                         let date = dayjs(item[e]).unix()
-                        // console.log(e, date)
+                        // this.$logger(e, date)
 
                         // let date = new Date(`${item[e]}`).getTime()
                         return isNaN(date) ? 0 : date
@@ -356,7 +356,7 @@ export default {
                 })
 
                 // if (i == 1) {
-                // console.log(now)
+                // this.$logger(now)
 
                 let flag = await this.onEachInsert(key, item)
 
@@ -364,7 +364,7 @@ export default {
                 item.forEach((e, i) => {
                     result[values[i]] = e
                 })
-                // console.log(item.created, item.date_end, _d)
+                // this.$logger(item.created, item.date_end, _d)
                 // _d=null 则成功。反之返回错误信息
                 // data.push({...this.datas[i], isok: !_d})
                 if (!flag) {

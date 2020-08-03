@@ -275,7 +275,7 @@ export default {
         parseDate(v) {
             return dayjs(v * 1000).format('YYYY-MM-DD hh:ss:mm')
             // let date = new Date(v * 1)
-            // console.log(v, date)
+            // this.$logger(v, date)
             // return `${date.getFullYear()}年${date.getMonth() +
             //     1}月${date.getDay()}日 ${date.getHours()}时${date.getMinutes()}分${date.getSeconds()}秒`
         }
@@ -302,7 +302,7 @@ export default {
             }
         },
         onFetchAddrs() {
-            console.log('hhhh')
+            this.$logger('hhhh')
             if (!this.addrs.length) this.onFetchQudao()
         },
         onFetchProductMain() {
@@ -323,7 +323,7 @@ export default {
             )
                 .then(() => {
                     let where = this.onParseSearchSQL()
-                    console.log({ where })
+                    this.$logger({ where })
                     if (!where) {
                         where = 'where true'
                     }
@@ -335,7 +335,7 @@ export default {
 
                     const sql = `delete from accept ${where}`
                     this.$db.run(sql, (err, res) => {
-                        console.log(err, res)
+                        this.$logger(err, res)
                         this.deleteLoading = false
                         this.$message({
                             type: err ? 'error' : 'success',
@@ -354,13 +354,13 @@ export default {
             if (this[`${key}s`].length) {
                 return
             }
-            console.log({ key })
+            this.$logger({ key })
             const sql = `select ${key} as val from accept group by ${key}`
             this.$db.all(sql, (err, res) => {
                 if (err) {
-                    console.log(err)
+                    this.$logger(err)
                 } else {
-                    console.log(res)
+                    this.$logger(res)
                     // this.dataListTotalCount = res.totalCount;
                     const data = res.map(e => e.val).filter(e => e)
                     this.$set(this, `${key}s`, data)
@@ -368,7 +368,7 @@ export default {
             })
         },
         handleCurrentChange(page) {
-            console.log(page)
+            this.$logger(page)
             const where = this.onParseSearchSQL(page)
             this.onFetchDatas(where)
         },
@@ -399,7 +399,7 @@ export default {
                 let b = dayjs(date)
                     .endOf('month')
                     .unix()
-                console.log(a, b)
+                this.$logger(a, b)
                 where.push(`created between ${a} and ${b}`)
             }
             if (this.date_end) {
@@ -415,7 +415,7 @@ export default {
             }
             // const a = false && this.created && this.created.getTime()
             // const b = false && this.date_end && this.date_end.getTime()
-            // console.log(this.created)
+            // this.$logger(this.created)
             // if (a && b) {
             //     where.push(`created between ${a} and ${b}`)
             // } else if (a) {
@@ -437,7 +437,7 @@ export default {
                 where.push(`action_no like '%${this.action_no}%' or user_number like '%${this.action_no}%'`)
             }
 
-            console.log({ where })
+            this.$logger({ where })
             if (where.length > 0) {
                 where = where.join(' and ')
                 where = `where ${where}`
@@ -448,7 +448,7 @@ export default {
         },
         handleSearch(isClear) {
             let where = ''
-            console.log({ isClear })
+            this.$logger({ isClear })
             if (isClear == 'clear') {
                 this.user = ''
                 this.addr = ''
@@ -474,7 +474,7 @@ export default {
                     const datas = this.parseAoaData()
                     const name = `${where}`
                     const book_name = 'book_name'
-                    console.log(datas)
+                    this.$logger(datas)
 
                     download.excel2(datas, name, book_name).then(res => {
                         this.outputLoading = false
@@ -493,12 +493,12 @@ export default {
         parseAoaData() {
             const line1 = Object.values(this.items)
             const keys = Object.keys(this.items)
-            console.log(line1, keys)
+            this.$logger(line1, keys)
             const datas = this.datas.map(v => {
                 return keys.map(k => v[k])
             })
             datas.unshift(line1)
-            console.log(datas)
+            this.$logger(datas)
             return datas
         },
 
@@ -507,9 +507,9 @@ export default {
             const sql = `select addr from accept group by addr`
             this.$db.all(sql, (err, res) => {
                 if (err) {
-                    console.log(err)
+                    this.$logger(err)
                 } else {
-                    console.log(res)
+                    this.$logger(res)
                     // this.dataListTotalCount = res.totalCount;
                     this.addrs = res.map(e => e.addr)
                 }
@@ -524,18 +524,18 @@ export default {
             })
         },
         onFetchDatas(whereSQL = '', limit = 20) {
-            console.log({ page: this.page })
+            this.$logger({ page: this.page })
             limit = limit ? `limit ${this.limit * (this.page - 1)}, ${this.limit}` : ''
             const sql = `select * from accept ${whereSQL} ${limit}`
 
-            console.log(sql)
+            this.$logger(sql)
             return new Promise((resolve, reject) => {
                 this.$db.all(sql, (err, res) => {
                     if (err) {
-                        console.log(err)
+                        this.$logger(err)
                         reject(err)
                     } else {
-                        console.log(res)
+                        this.$logger(res)
                         // this.dataListTotalCount = res.totalCount;
                         this.datas = res
                         resolve(res)

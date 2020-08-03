@@ -138,9 +138,9 @@ export default {
             const sql = `select ${key} as val from accept group by ${key}`
             this.$db.all(sql, (err, res) => {
                 if (err) {
-                    console.log({ err })
+                    this.$logger({ err })
                 } else {
-                    console.log('xxxxxxxxx', { res })
+                    this.$logger('xxxxxxxxx', { res })
                     // this.dataListTotalCount = res.totalCount;
                     const data = res
                         .map(e => e.val)
@@ -172,7 +172,7 @@ export default {
                 'select p.*,(select count(*) from accept i where i.product_main = p.name) as accept_count from package p'
 
             this.$db.all(sql, (err, res) => {
-                console.log(err, res)
+                this.$logger(err, res)
                 if (!err) {
                     this.datas = res
                     this.remoteMethod(res)
@@ -185,29 +185,29 @@ export default {
             // 1. 先通过套餐获取对应的受理清单（结算次数）
             // 2. 循环所有，判断月份
 
-            console.log('onFetchSettle', vals)
+            this.$logger('onFetchSettle', vals)
             for (var i = vals.length - 1; i >= 0; i--) {
                 let { name, count } = vals[i]
-                console.log(name, count)
+                this.$logger(name, count)
                 const sql = `select a.date_end,a.js_count from  accept as a where a.js_count < ${count} and product_main='${name}'`
                 const data = await new Promise(resolve => {
                     this.$db.all(sql, (err, res) => {
                         if (!err) {
-                            // console.log({ vals }, i)
+                            // this.$logger({ vals }, i)
                             resolve(res)
-                            // console.log(day, now, law, count)
+                            // this.$logger(day, now, law, count)
                         } else {
                             resolve([])
                         }
                     })
                 })
 
-                console.log({ data }, i)
+                this.$logger({ data }, i)
                 this.onCalcCount(vals[i], data)
             }
         },
         onCalcCount(item, vals) {
-            console.log({ item })
+            this.$logger({ item })
             let { name, count, law, id } = item
 
             const now = dayjs().format('YYYYMM')
@@ -216,7 +216,7 @@ export default {
             law = law.toString().split(',')
             law.length = count
             law = Array.from(law).map(e => e | 0 || 1)
-            console.log({ law })
+            this.$logger({ law })
             let result = 0 //总结算次数
             let __nums = 0 //总结算清单数
 
@@ -237,7 +237,7 @@ export default {
                     let flag = day <= now
 
                     if (name === '5G畅享199元套餐201910') {
-                        console.log('5G畅享199元套餐201910------------', (day | 0) + (_law[i] | 0), day, flag)
+                        this.$logger('5G畅享199元套餐201910------------', (day | 0) + (_law[i] | 0), day, flag)
                     }
                     // 月份小于规则，结算数量就+1，反之跳出
                     if (flag) {
@@ -257,7 +257,7 @@ export default {
             })
             // 获取当前查询套餐的INDEX
             const idx = this.datas.findIndex(e => e.id == id)
-            console.log({ result, len: vals.length, idx })
+            this.$logger({ result, len: vals.length, idx })
 
             this.$set(this.datas[idx], '__count', result)
             this.$set(this.datas[idx], '__nums', __nums)
@@ -267,7 +267,7 @@ export default {
                 if (valid) {
                     this.onInsertDatabase()
                 } else {
-                    console.log('error submit!!')
+                    this.$logger('error submit!!')
                     this.$message({
                         type: 'error',
                         message: '请检查输入的内容是否正确'
@@ -277,14 +277,14 @@ export default {
             })
         },
         onInsertDatabase() {
-            // console.log(sql)
+            // this.$logger(sql)
 
             let sql = ''
             if (this.isedit) {
                 let params = []
                 for (let k in this.ruleForm) {
                     let v = this.ruleForm[k]
-                    console.log(v)
+                    this.$logger(v)
                     if (k === 'name') {
                         v = v.toString().trim()
                     }
@@ -297,7 +297,7 @@ export default {
                 const values = Object.values(this.ruleForm).join(`','`)
                 sql = `INSERT INTO package (${keys}) VALUES ('${values}')`
             }
-            console.log(sql)
+            this.$logger(sql)
             this.$db.run(sql, err => {
                 if (err) {
                     this.$message({
@@ -308,7 +308,7 @@ export default {
                     this.onFetchDatas()
                     this.dialogVisible = false
                 }
-                console.log(err)
+                this.$logger(err)
             })
         },
         resetForm(formName) {
@@ -322,7 +322,7 @@ export default {
             this.dialogVisible = true
         },
         handleDeleteRow(index, rows) {
-            console.log(index, rows)
+            this.$logger(index, rows)
 
             this.$confirm('确定要删除该套餐吗？', '提示', {
                 confirmButtonText: '确定',

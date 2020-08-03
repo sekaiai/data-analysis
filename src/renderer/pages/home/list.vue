@@ -158,14 +158,14 @@ export default {
         parseDate(v) {
             return dayjs(v * 1000).format('YYYY-MM-DD hh:ss:mm')
             // let date = new Date(v * 1)
-            // console.log(v, date)
+            // this.$logger(v, date)
             // return `${date.getFullYear()}年${date.getMonth() +
             //     1}月${date.getDay()}日 ${date.getHours()}时${date.getMinutes()}分${date.getSeconds()}秒`
         }
     },
     created() {
         const { created, status } = this.$route.query
-        console.log('xxxxxxxx', this.$route)
+        this.$logger('xxxxxxxx', this.$route)
         if (created) {
             this.created = created
         }
@@ -236,7 +236,7 @@ export default {
             let where = this.onParseSearchSQL()
             const sql = `select * from bill ${where} ${limit}`
             this.$db.all(sql, (err, res = []) => {
-                console.log({ res, sql })
+                this.$logger({ res, sql })
                 this.datas = res
             })
         },
@@ -245,7 +245,7 @@ export default {
             const sql = `select count(*) as total from bill ${where}`
 
             this.$db.get(sql, (err, res) => {
-                // console.log({ count: res })
+                // this.$logger({ count: res })
                 if (!err && res) {
                     this.total = res.total
                 }
@@ -271,9 +271,9 @@ export default {
             const sql = `select package_name as val from bill group by package_name`
             this.$db.all(sql, (err, res) => {
                 if (err) {
-                    console.log(err)
+                    this.$logger(err)
                 } else {
-                    console.log(res)
+                    this.$logger(res)
                     // this.dataListTotalCount = res.totalCount;
                     const data = res.map(e => e.val).filter(e => e)
                     this.$set(this, `package_name_arr`, data)
