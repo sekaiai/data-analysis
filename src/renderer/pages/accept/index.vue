@@ -11,14 +11,24 @@
             <!-- 产品名称 -->
             <div class="flex-item">
                 <div class="title">选择产品名称</div>
-                <el-select v-model="product_name" placeholder="选择产品名称" @click.native="onFetchProductName" filterable>
+                <el-select
+                    v-model="product_name"
+                    placeholder="选择产品名称"
+                    @click.native="onFetchProductName"
+                    filterable
+                >
                     <el-option :label="v" :value="v" v-for="(v, i) in product_names" :key="i"></el-option>
                 </el-select>
             </div>
             <!-- 产品名称 -->
             <div class="flex-item">
                 <div class="title">选择所属主销售品</div>
-                <el-select v-model="product_main" placeholder="选择所属主销售品" filterable @click.native="onFetchProductMain">
+                <el-select
+                    v-model="product_main"
+                    placeholder="选择所属主销售品"
+                    filterable
+                    @click.native="onFetchProductMain"
+                >
                     <el-option :label="v" :value="v" v-for="(v, i) in product_mains" :key="i"></el-option>
                 </el-select>
             </div>
@@ -59,14 +69,12 @@
                 <div class="title">请选择受理时间</div>
                 <!--                <el-date-picker v-model="created" type="daterange" align="right" unlink-panels range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" :picker-options="pickerOptions">
                 </el-date-picker> -->
-                <el-date-picker v-model="created" type="month" placeholder="选择月">
-                </el-date-picker>
+                <el-date-picker v-model="created" type="month" placeholder="选择月"> </el-date-picker>
             </div>
             <!-- 竣工时间  -->
             <div class="flex-item">
                 <div class="title">请选择竣工时间</div>
-                <el-date-picker v-model="date_end" type="month" placeholder="选择月">
-                </el-date-picker>
+                <el-date-picker v-model="date_end" type="month" placeholder="选择月"> </el-date-picker>
                 <!-- 请选择受理时间 -->
                 <!--      <el-date-picker v-model="date_end" type="daterange" align="right" unlink-panels range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" :picker-options="pickerOptions">
                 </el-date-picker> -->
@@ -87,17 +95,34 @@
             </div>
         </div>
         <div class="title-line shrink0">
-            数据列表
-            <small>共有<b>{{ total }}</b>条数据</small>
-            <el-button style="margin-left: 20px;" @click="$router.push(`/accept/add`)" type="primary" size="mini">新增受理清单</el-button>
-            <el-button style="margin-left: 10px;" type="success" :loading="outputLoading" @click="handleOutputDatas" size="mini">导出查询结果</el-button>
-            <el-button style="margin-left: 10px;" :loading="deleteLoading" @click="handleDeleteDatas" size="mini">清除查询结果(删除本地数据)</el-button>
+            受理清单列表
+            <small
+                >共有<b>{{ total }}</b
+                >条数据</small
+            >
+            <el-button style="margin-left: 20px;" @click="$router.push(`/accept/add`)" type="primary" size="mini"
+                >新增受理清单</el-button
+            >
+            <el-button
+                style="margin-left: 10px;"
+                type="success"
+                :loading="outputLoading"
+                @click="handleOutputDatas"
+                size="mini"
+                >导出查询结果</el-button
+            >
+            <el-button style="margin-left: 10px;" :loading="deleteLoading" @click="handleDeleteDatas" size="mini"
+                >清除查询结果(删除本地数据)</el-button
+            >
         </div>
         <div class="table-box flex1" ref="tableBox">
             <el-table :data="datas" :height="tableHeight" v-if="tableHeight">
                 <el-table-column type="expand">
                     <template slot-scope="props">
                         <el-form label-position="left" inline class="demo-table-expand">
+                            <el-form-item label="副卡(结算号)">
+                                <span>{{ props.row.user_number || '-' }}</span>
+                            </el-form-item>
                             <el-form-item label="购物车流水号">
                                 <span>{{ props.row.no }}</span>
                             </el-form-item>
@@ -126,7 +151,7 @@
                                 <span>{{ props.row.user }}</span>
                             </el-form-item>
                             <el-form-item label="导入时间">
-                                <span>{{ props.row.import_date| parseDate }}</span>
+                                <span>{{ props.row.import_date | parseDate }}</span>
                             </el-form-item>
                             <el-form-item label="备注">
                                 <span>{{ props.row.remark || '-' }}</span>
@@ -141,14 +166,23 @@
                 <el-table-column prop="status" label="工单状态"> </el-table-column>
                 <el-table-column prop="date_end" label="竣工时间">
                     <template slot-scope="scope">
-                        {{ scope.row.date_end | parseDate}}
+                        {{ scope.row.date_end | parseDate }}
                     </template>
                 </el-table-column>
                 <!--     <el-table-column v-for="(v, i) in items" :prop="i" :label="v"> </el-table-column> -->
                 <!-- <el-table-column prop="no" label="购物车流水号"> </el-table-column> -->
             </el-table>
         </div>
-        <el-pagination class="pagination shrink0" @current-change="handleCurrentChange" :hide-on-single-page="true" background layout="prev, pager, next" :current-page.sync="page" :total="total" :page-size="20">
+        <el-pagination
+            class="pagination shrink0"
+            @current-change="handleCurrentChange"
+            :hide-on-single-page="true"
+            background
+            layout="prev, pager, next"
+            :current-page.sync="page"
+            :total="total"
+            :page-size="20"
+        >
         </el-pagination>
     </div>
 </template>
@@ -170,7 +204,8 @@ export default {
             fileList: [],
             datas: [],
             pickerOptions: {
-                shortcuts: [{
+                shortcuts: [
+                    {
                         text: '最近一周',
                         onClick(picker) {
                             const end = new Date()
@@ -258,7 +293,6 @@ export default {
             if (!this.acceptor.length) {
                 if (!this.users.length) this.remoteMethod('user')
             }
-
         },
 
         onFetchAcceptor() {
@@ -266,12 +300,10 @@ export default {
                 if (!this.acceptors.length) this.remoteMethod('acceptor')
                 // 查询受理人
             }
-
         },
         onFetchAddrs() {
             console.log('hhhh')
             if (!this.addrs.length) this.onFetchQudao()
-
         },
         onFetchProductMain() {
             if (!this.product_mains.length) this.remoteMethod('product_main')
@@ -281,13 +313,14 @@ export default {
         },
         handleDeleteDatas() {
             this.$confirm(
-                    '删除前先点查询确认下是否是要删除的数据，该操作会删除所选条件下的所有数据且不可恢复。',
-                    '提示', {
-                        confirmButtonText: '确定',
-                        cancelButtonText: '取消',
-                        type: 'warning'
-                    }
-                )
+                '删除前先点查询确认下是否是要删除的数据，该操作会删除所选条件下的所有数据且不可恢复。',
+                '提示',
+                {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                }
+            )
                 .then(() => {
                     let where = this.onParseSearchSQL()
                     console.log({ where })
@@ -360,16 +393,24 @@ export default {
             if (this.created) {
                 let date = this.created
 
-                let a = dayjs(date).startOf('month').unix()
-                let b = dayjs(date).endOf('month').unix()
+                let a = dayjs(date)
+                    .startOf('month')
+                    .unix()
+                let b = dayjs(date)
+                    .endOf('month')
+                    .unix()
                 console.log(a, b)
                 where.push(`created between ${a} and ${b}`)
             }
             if (this.date_end) {
                 let date = this.date_end
 
-                let a = dayjs(date).startOf('month').unix()
-                let b = dayjs(date).endOf('month').unix()
+                let a = dayjs(date)
+                    .startOf('month')
+                    .unix()
+                let b = dayjs(date)
+                    .endOf('month')
+                    .unix()
                 where.push(`date_end between ${a} and ${b}`)
             }
             // const a = false && this.created && this.created.getTime()
@@ -393,7 +434,7 @@ export default {
                 where.push(`product_name='${this.product_name}'`)
             }
             if (this.action_no !== '') {
-                where.push(`action_no like '%${this.action_no}%'`)
+                where.push(`action_no like '%${this.action_no}%' or user_number like '%${this.action_no}%'`)
             }
 
             console.log({ where })
@@ -508,12 +549,5 @@ export default {
 <style lang="less" scoped>
 .line2 {
     padding-top: 10px;
-}
-
-.flex-item {
-    .title {
-        font-size: 12px;
-        color: #c0c4cc;
-    }
 }
 </style>

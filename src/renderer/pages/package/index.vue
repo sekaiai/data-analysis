@@ -1,14 +1,14 @@
 <template>
     <div id="package">
         <div class="title-line">
-            受理清单以有套餐<el-button @click="onRefersh" style="margin-left: 10px;" type="text" size="mini">
+            受理清单已有套餐<el-button @click="onRefersh" style="margin-left: 10px;" type="text" size="mini">
                 刷新数据
             </el-button>
         </div>
         <div class="tags-box">
-            <el-tag v-for="(item,i) in product_mains" :key="i" type="info" effect="plain" size="medium">
+            <el-tag v-for="(item, i) in product_mains" :key="i" type="info" effect="plain" size="medium">
                 {{ item.val }}
-                <span @click='handleTags2add(item.val)' v-if='!item.has' class="span">添加</span>
+                <span @click="handleTags2add(item.val)" v-if="!item.has" class="span">添加</span>
             </el-tag>
         </div>
         <div class="title-line">
@@ -37,7 +37,13 @@
                 </el-table-column>
             </el-table>
         </div>
-        <el-dialog title="提示" :visible.sync="dialogVisible" width="500px" :before-close="handleClose" @close='isedit = 0'>
+        <el-dialog
+            title="提示"
+            :visible.sync="dialogVisible"
+            width="500px"
+            :before-close="handleClose"
+            @close="isedit = 0"
+        >
             <el-form :model="ruleForm" :rules="rules" ref="ruleForm" class="demo-ruleForm">
                 <el-form-item prop="name" label="发展套餐名称">
                     <div class="taocao-tip">*必须与受理清单表和结算表中的套餐名称一致！</div>
@@ -52,13 +58,15 @@
                 <el-form-item prop="law" label="结算规律">
                     <div class="taocao-tip">
                         <p>每次结算时间用半角逗号分隔。每个逗号代表每次结算的间隔。</p>
-                        <p style="line-height: 1.4;">例：某套餐次月开结算，之后每月都结算共结算3次。 填写1,0,0。0可以不填写。所以填写一个1就行了。</p>
-                        <p>例：某套餐次月开始结算，共结算3次，每次结算周期加一月则写。 1,1,1</p>
+                        <p style="line-height: 1.4;">
+                            例：某套餐次月开结算，之后每月都结算共结算3次。 填写1,1,1。这里填写一个1就行了。
+                        </p>
+                        <p>例：某套餐次月开始结算，每次结算+1月，共结算3次。 1,2,2</p>
                     </div>
                     <el-input v-model="ruleForm['law']"></el-input>
                 </el-form-item>
                 <el-form-item prop="law_desc" label="备注信息、结算说明">
-                    <el-input v-model="ruleForm['law_desc']" type='textarea'></el-input>
+                    <el-input v-model="ruleForm['law_desc']" type="textarea"></el-input>
                 </el-form-item>
                 <el-form-item>
                     <el-button type="primary" @click="submitForm('ruleForm')">立即创建</el-button>
@@ -72,6 +80,13 @@ import dayjs from 'dayjs'
 
 export default {
     data() {
+        var validatePass = (rule, value, callback) => {
+            if (!/^(\d|,)+$/.test(value)) {
+                callback(new Error('请输入数字和半角逗号（,）'))
+            } else {
+                callback()
+            }
+        }
         return {
             product_mains: [], //所有套餐
             dialogVisible: false,
@@ -81,14 +96,12 @@ export default {
                 // begin: '', //开始结算月份
                 count: '', //结算次数
                 law: '', //结算规律
-                law_desc: '', //规律说明
+                law_desc: '' //规律说明
             },
             rules: {
-                name: [
-                    { required: true, message: '请输入发展套餐名称', trigger: 'blur' },
-                ],
+                name: [{ required: true, message: '请输入发展套餐名称', trigger: 'blur' }],
                 count: [{ required: true, message: '请输入结算次数', trigger: 'change' }],
-                law: [{ required: true, message: '请输入结算次数规律', trigger: 'blur' }],
+                law: [{ required: true, message: '请输入结算次数规律', trigger: 'blur' }, { validator: validatePass }]
             },
             datas: [],
             items: {
@@ -97,7 +110,7 @@ export default {
                 count: '结算次数',
                 law: '结算规律',
                 law_desc: '结算说明',
-                accept_count: '待结算受理数',
+                accept_count: '待结算受理数'
             }
         }
     },
@@ -107,7 +120,6 @@ export default {
     methods: {
         onRefersh() {
             this.onFetchDatas()
-
         },
         handleTags2add(v) {
             // 从tag添加套餐
@@ -116,12 +128,11 @@ export default {
                 // begin: '', //开始结算月份
                 count: '', //结算次数
                 law: '', //结算规律
-                law_desc: '', //规律说明
+                law_desc: '' //规律说明
             }
             this.dialogVisible = true
         },
         remoteMethod(datas = []) {
-
             const key = 'product_main'
             const hasd = datas.map(e => e.name)
             const sql = `select ${key} as val from accept group by ${key}`
@@ -131,13 +142,15 @@ export default {
                 } else {
                     console.log('xxxxxxxxx', { res })
                     // this.dataListTotalCount = res.totalCount;
-                    const data = res.map(e => e.val).filter(e => e).map(e => {
-
-                        return {
-                            val: e,
-                            has: hasd.includes(e)
-                        }
-                    })
+                    const data = res
+                        .map(e => e.val)
+                        .filter(e => e)
+                        .map(e => {
+                            return {
+                                val: e,
+                                has: hasd.includes(e)
+                            }
+                        })
                     this.$set(this, `${key}s`, data)
                 }
             })
@@ -150,13 +163,13 @@ export default {
                 name,
                 count,
                 law,
-                law_desc,
+                law_desc
             }
             this.dialogVisible = true
-
         },
         onFetchDatas() {
-            const sql = 'select p.*,(select count(*) from accept i where i.product_main = p.name) as accept_count from package p'
+            const sql =
+                'select p.*,(select count(*) from accept i where i.product_main = p.name) as accept_count from package p'
 
             this.$db.all(sql, (err, res) => {
                 console.log(err, res)
@@ -165,8 +178,6 @@ export default {
                     this.remoteMethod(res)
                     this.onFetchSettle(res)
                 }
-
-
             })
         },
         async onFetchSettle(vals) {
@@ -174,10 +185,8 @@ export default {
             // 1. 先通过套餐获取对应的受理清单（结算次数）
             // 2. 循环所有，判断月份
 
-
             console.log('onFetchSettle', vals)
             for (var i = vals.length - 1; i >= 0; i--) {
-
                 let { name, count } = vals[i]
                 console.log(name, count)
                 const sql = `select a.date_end,a.js_count from  accept as a where a.js_count < ${count} and product_main='${name}'`
@@ -187,21 +196,15 @@ export default {
                             // console.log({ vals }, i)
                             resolve(res)
                             // console.log(day, now, law, count)
-
                         } else {
                             resolve([])
                         }
-
-
                     })
-
                 })
 
                 console.log({ data }, i)
                 this.onCalcCount(vals[i], data)
-
             }
-
         },
         onCalcCount(item, vals) {
             console.log({ item })
@@ -212,13 +215,12 @@ export default {
             // 组装每月结算间隔
             law = law.toString().split(',')
             law.length = count
-            law = Array.from(law).map(e => ((e | 0) || 1))
+            law = Array.from(law).map(e => e | 0 || 1)
             console.log({ law })
             let result = 0 //总结算次数
             let __nums = 0 //总结算清单数
 
             vals.forEach(e => {
-
                 // 竣工时间
                 let day = dayjs(e.date_end * 1000).format('YYYYMM')
 
@@ -235,18 +237,15 @@ export default {
                     let flag = day <= now
 
                     if (name === '5G畅享199元套餐201910') {
-
                         console.log('5G畅享199元套餐201910------------', (day | 0) + (_law[i] | 0), day, flag)
                     }
                     // 月份小于规则，结算数量就+1，反之跳出
                     if (flag) {
                         __count++
                     } else {
-                        break;
-
+                        break
                     }
                 }
-
 
                 // 减去以结算的
                 __count = __count - e.js_count
@@ -262,7 +261,6 @@ export default {
 
             this.$set(this.datas[idx], '__count', result)
             this.$set(this.datas[idx], '__nums', __nums)
-
         },
         submitForm(formName) {
             this.$refs[formName].validate(valid => {
@@ -279,20 +277,16 @@ export default {
             })
         },
         onInsertDatabase() {
-
             // console.log(sql)
 
             let sql = ''
             if (this.isedit) {
-
                 let params = []
                 for (let k in this.ruleForm) {
                     let v = this.ruleForm[k]
                     console.log(v)
                     if (k === 'name') {
-
                         v = v.toString().trim()
-
                     }
                     params.push(`${k}='${v}'`)
                 }
@@ -331,10 +325,10 @@ export default {
             console.log(index, rows)
 
             this.$confirm('确定要删除该套餐吗？', '提示', {
-                    confirmButtonText: '确定',
-                    cancelButtonText: '取消',
-                    type: 'warning'
-                })
+                confirmButtonText: '确定',
+                cancelButtonText: '取消',
+                type: 'warning'
+            })
                 .then(() => {
                     const { id } = this.datas[index]
                     const sql = `delete from package where id = ${id}`
@@ -356,7 +350,7 @@ export default {
                         message: '删除失败'
                     })
                 })
-        },
+        }
     }
 }
 </script>

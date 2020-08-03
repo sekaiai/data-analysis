@@ -13,10 +13,14 @@
                 <i class="el-icon-s-cooperation"></i>
                 <span slot="title">套餐管理</span>
             </el-menu-item>
+            <el-menu-item index="4" :route="{ name: 'relate' }">
+                <i class="el-icon-s-cooperation"></i>
+                <span slot="title">关联副卡</span>
+            </el-menu-item>
         </el-menu>
         <!-- <el-scrollbar class='main'> -->
         <div class="continer flex1 flex">
-            <keep-alive>
+            <keep-alive exclude="blist">
                 <router-view class="main flex1 flex-column flex"></router-view>
             </keep-alive>
         </div>

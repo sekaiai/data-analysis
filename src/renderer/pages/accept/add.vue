@@ -1,7 +1,7 @@
 <template>
     <div id="home-add" v-loading.lock="loading" element-loading-text="正在解析数据">
         <div class="title-line shrink0">导入受理清单</div>
-        <div style="margin-bottom: 20px">本月已导入{{monthLength}}条数据</div>
+        <div style="margin-bottom: 20px">本月已导入{{ monthLength }}条数据</div>
         <div class="form-line">
             <div class="flex">
                 <!-- <el-upload class="upload-demo" ref="upload" multiple accept='.xls,.xlsx' action="/" :auto-upload="false"> -->
@@ -9,10 +9,11 @@
                 <!-- <el-button slot="trigger" type="primary" :loading="loading">导入用户表<i class="el-icon-upload"></i></el-button> -->
                 <!-- </el-upload> -->
                 <el-button type="primary" @click="submitUpload">
-                    <template v-if='datas.length'>
+                    <template v-if="datas.length">
                         <span>重新</span>
                     </template>
-                    选择受理清单文件</el-button>
+                    选择受理清单文件</el-button
+                >
                 <!-- <div slot="tip" @click="logsVisible = true" class="el-upload__tip" v-if="logs.length">
                     解析记录
                 </div> -->
@@ -24,14 +25,22 @@
                 <p v-for="(v, i) in logs" :key="i" v-html="v"></p>
             </div>
         </template>
-        <div class="form-line" style="margin-top: 20px" v-if='datas.length'>
+        <div class="form-line" style="margin-top: 20px" v-if="datas.length">
             <el-button :loading="insertStatus" type="success" @click="handleInsertData">
                 开始写入数据库
             </el-button>
             <div style="margin-top: 20px;">
-                <div>写入成功 ({{success.length}})条 <el-button v-if='!insertStatus' type="text" @click='handleAnalysisDownload(`success`)'>导出Excel</el-button>
+                <div>
+                    写入成功 ({{ success.length }})条
+                    <el-button v-if="!insertStatus" type="text" @click="handleAnalysisDownload(`success`)"
+                        >导出Excel</el-button
+                    >
                 </div>
-                <div>写入失败 ({{error.length}})条 <el-button v-if='!insertStatus' type="text" @click='handleAnalysisDownload(`error`)'>导出Excel</el-button>
+                <div>
+                    写入失败 ({{ error.length }})条
+                    <el-button v-if="!insertStatus" type="text" @click="handleAnalysisDownload(`error`)"
+                        >导出Excel</el-button
+                    >
                 </div>
             </div>
         </div>
@@ -116,16 +125,19 @@ export default {
             }
 
             return this.datas2.slice(start, start + limit)
-        },
+        }
     },
     created() {
         this.onFetchMonthLength()
     },
     methods: {
         onFetchMonthLength() {
-
-            const firstDay = dayjs().startOf('month').unix()
-            const lastDay = dayjs().endOf('month').unix()
+            const firstDay = dayjs()
+                .startOf('month')
+                .unix()
+            const lastDay = dayjs()
+                .endOf('month')
+                .unix()
 
             const sql = `select count(*) as count from accept where import_date between ${firstDay} and ${lastDay}`
 
@@ -183,7 +195,7 @@ export default {
             }).then(() => {
                 // 下载
                 // datas = this.parseAoaData(datas)
-      
+
             })*/
         },
         parseAoaData(datas) {
@@ -228,10 +240,10 @@ export default {
                         this.onOpenFile(e, i)
                     } catch (err) {
                         this.$confirm(`解析文件出现错误文件[${e}], 是否重试?`, '提示', {
-                                confirmButtonText: '确定',
-                                cancelButtonText: '取消',
-                                type: 'warning'
-                            })
+                            confirmButtonText: '确定',
+                            cancelButtonText: '取消',
+                            type: 'warning'
+                        })
                             .then(() => {
                                 this.onOpenFile(e)
                             })
@@ -267,73 +279,52 @@ export default {
             this.logs.push(`[解析完成]：<span>${path}</span>数据表，共有${_datas.length}条数据`)
             this.logs.push(`[过滤数据]：<span>${path}</span>数据表`)
             //  )
-            _datas = _datas.filter(e => ((e['业务动作'] === '新装' || e['业务动作'] === '改速率') && e['工单状态'] === '已归档'))
+            _datas = _datas.filter(
+                e => (e['业务动作'] === '新装' || e['业务动作'] === '改速率') && e['工单状态'] === '已归档'
+            )
             this.datas.push(..._datas)
 
             this.logs.push(`[过滤完成]：<span>${path}</span>数据表，取得「改速率」和「新装」数据共${_datas.length}条`)
-
-            /*
-            // const table_values = Object.values(this.items)
-            // const table_keys = Object.keys(this.items)
-            从有数据的第一行开始查找
-            json.forEach((e, i) => {
-                const values = Object.values(e)
-                console.log(e)
-
-                const action = e['__EMPTY_6']
-                if (e.length > 2 && action === '新装') {
-                    // arr.push(values)
-                    console.log(e)
-
-                    let _data = {
-                        no: values[0],
-                        area: e['__EMPTY'],
-                        addr: e['__EMPTY_1'],
-                        acceptor: e['__EMPTY_2'], //'受理人',
-                        product_name: e['__EMPTY_3'], // '产品名称',
-                        product_type: e['__EMPTY_4'], // '角色名称',
-                        product_main: e['__EMPTY_5'], // '所属主销售品',
-                        action, // '业务动作',
-                        action_no: e['__EMPTY_7'], // '业务号码',
-                        created: e['__EMPTY_8'], // '受理时间',
-                        status: e['__EMPTY_9'], // '工单状态',
-                        date_end: e['__EMPTY_10'], // '竣工时间',
-                        user: e['__EMPTY_11'], // '揽收人',
-                        remark: e['__EMPTY_12'], // '备注',
-                    }
-                    arr.push(_data)
-                }
-            })
-*/
-            /*
-            多数据过滤
-                    const datas = []
-                        const _arr = [...this.datas, ...arr]
-                        _arr.forEach(e => {
-                            const idx = datas.findIndex(v => e.no == v.no)
-                            if (idx === -1) {
-                                datas.push(e)
-                            }
-                        })
-                        this.datas = datas
-            */
-
-            // this.datas.push(...arr)
-            // console.log({ arr: arr.length })
-            // resolve()
-
-            // 插入数据库
-            // })
-
-            // download.excel('xxx.xlsx', result2)
         },
-        onEachInsert(keys, values) {
-            const sql = `INSERT INTO accept (${keys}) VALUES (${values})`
-            // console.log(sql)
+        onEachInsert(keys, item) {
+            const vals = `'${item.join("','")}'`
+            const sql = `INSERT INTO accept (${keys}) VALUES (${vals})`
+
             return new Promise(resolve => {
                 this.$db.run(sql, err => {
                     if (err) {
                         console.log(err)
+                        // console.log()
+                        // 遇到相同的
+                        // 1. 查询出结果。
+                        // 2. 对照业务动作，新装的则保留新装
+                        // 3. 如果业务动作相同，保留受理日期小的。
+                        // const idx = values.findIndex(e => e === '业务号码')
+                        const values = {}
+                        keys.split(',').forEach((e, i) => {
+                            values[e] = item[i]
+                        })
+                        console.log({ values })
+                        // const action = item[idx]
+                        let ssql = `select * from accept where action_no = '${values.action_no}'`
+                        this.$db.get(ssql, (err, res) => {
+                            console.log({ res, err })
+                            if (res) {
+                                if ((values.action == '新装' && res.no !== values.no) || values.created < res.created) {
+                                    let dsql = `delete from accept where action_no = '${values.action_no}'`
+                                    this.$db.run(dsql, (err, res) => {
+                                        if (!err) {
+                                            this.$db.run(sql, (err, res) => {
+                                                console.log('该插入成功', { err, res })
+                                            })
+                                        }
+                                        console.log('删除数据', { err, res })
+                                    })
+                                } else {
+                                    console.log('数据相同他')
+                                }
+                            }
+                        })
                     }
                     resolve(err)
                 })
@@ -353,12 +344,10 @@ export default {
                 item = values.map(e => {
                     if (e == '受理时间' || e == '竣工时间') {
                         let date = dayjs(item[e]).unix()
-                        console.log(e, date)
+                        // console.log(e, date)
 
                         // let date = new Date(`${item[e]}`).getTime()
                         return isNaN(date) ? 0 : date
-
-
                     } else if (e == '导入时间') {
                         return now
                     } else {
@@ -367,15 +356,10 @@ export default {
                 })
 
                 // if (i == 1) {
-                console.log(now)
-                // }
+                // console.log(now)
 
-                // item['受理时间'] =
-                // item['竣工时间'] = new Date(item['竣工时间']).getTime() | 0
-                let flag = await this.onEachInsert(key, `'${item.join("','")}'`)
-                // const result = item.map((e, i) => ({
-                //     [values[i]]: e
-                // }))
+                let flag = await this.onEachInsert(key, item)
+
                 let result = {}
                 item.forEach((e, i) => {
                     result[values[i]] = e
@@ -387,7 +371,7 @@ export default {
                     this.success.push(result)
                 } else {
                     flag = flag.toString()
-                    if ((/UNIQUE/i).test(flag)) {
+                    if (/UNIQUE/i.test(flag)) {
                         flag = '业务号码已存在'
                     }
                     result['失败原因'] = flag

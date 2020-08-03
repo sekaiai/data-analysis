@@ -23,14 +23,14 @@ const routes = [
 export default routes;
 */
 
-
 import Vue from 'vue'
 import Router from 'vue-router'
 
 Vue.use(Router)
 
 export default new Router({
-    routes: [{
+    routes: [
+        {
             path: '/',
             name: 'analyze',
             component: require('@/pages/home/index.vue').default
@@ -54,6 +54,11 @@ export default new Router({
             path: '/package',
             name: 'package',
             component: require('@/pages/package/index.vue').default
+        },
+        {
+            path: '/relate',
+            name: 'relate',
+            component: require('@/pages/relate/index.vue').default
         },
         {
             path: '*',

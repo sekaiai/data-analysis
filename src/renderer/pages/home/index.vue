@@ -1,47 +1,83 @@
 <template>
-    <div id='home' v-loading.lock="loading" element-loading-text="正在解析数据">
-        <div class="clear" @click='handleClearData'>清空数据表</div>
+    <div id="home" v-loading.lock="loading" :element-loading-text="`正在解析数据`">
+        <div class="clear" @click="handleClearData">清空数据表</div>
         <div class="title-line">结算分析</div>
         <div class="form-line">
-            <!-- <div class="flex">
-                <el-upload class="upload-demo" :on-change='onChange' ref="upload" multiple accept='.xls,.xlsx' action="/" :auto-upload="false">
-                    <el-button slot="trigger" size="small" type="primary">选取文件</el-button>
-                    <el-button slot="trigger" type="primary" :loading="loading">请选择要筛选的文件<i class="el-icon-upload"></i></el-button>
-                    <el-button style="margin-left: 10px;" type="success" @click="submitUpload">开始分析</el-button>
-                    <div slot="tip" class="el-upload__tip">只能上传xls/xlxs文件，且不超过500M</div>
-                </el-upload>
-            </div> -->
             <el-button type="primary" @click="submitUpload">导入结算清单</el-button>
         </div>
         <div class="title-line">导入结算表分析</div>
-        <p>共导入{{tableNum.length}}张表</p>
-        <p>结算成功：{{success.length}}</p>
-        <p>结算数据：{{errors.length}}</p>
-        <p>共有数据：{{datas.length}}</p>
-        <p>写入数据成功：{{insertSuccess.length}}条
-            <el-button v-if='insertSuccess.length' type="text" size='mini' @click='handleAnalysisDownload(`insertSuccess`)'>(导出)</el-button>
-        </p>
-        <p>写入失败数据：{{insertError.length}}条
-            <el-button v-if='insertError.length' type="text" size='mini' @click='handleAnalysisDownload(`insertError`)'>(导出)</el-button>
+        <p>共导入{{ tableNum.length }}张表</p>
+        <p>结算成功：{{ importSuccessCount }}</p>
+        <p>结算数据：{{ importErrorCount }}</p>
+        <p>共有数据：{{ datas.length }}</p>
+        <p>写入数据成功：{{ insertSuccessCount }}条</p>
+        <p>
+            写入失败数据：{{ insertError.length }}条
+            <el-button
+                v-if="insertError.length"
+                :loading="outputLoading === 'insertError'"
+                type="text"
+                size="mini"
+                @click="handleAnalysisDownload(`insertError`)"
+                >(导出)</el-button
+            >
         </p>
         <div class="title-line">账期分析</div>
         <p>
-            本月需要结算的清单数量<span>{{accept_count}}</span>，本月需要处理的受理清单<span>{{accept_length}}</span>
+            本月需要结算的清单数量<span>{{ accept_count }}</span>
+            <el-button
+                v-if="accept_count"
+                :loading="outputLoading === 'accept_count'"
+                type="text"
+                size="mini"
+                @click="onFetchAccept('accept_count')"
+            >
+                (导出)
+            </el-button>
+            条
         </p>
         <p>
-            本月已导入<span>{{monthInsertData.length}}</span>条清单,
+            本月需要结算受理清单<span>{{ accept_length }}</span>
+            <el-button
+                v-if="accept_count"
+                :loading="outputLoading === 'accept_length'"
+                type="text"
+                size="mini"
+                @click="onFetchAccept('accept_length')"
+                >(导出)
+            </el-button>
+            条
         </p>
         <p>
-            结算成功清单<span>{{monthInsertSuccess.length}}</span>
-            <el-button v-if='monthInsertSuccess.length' type="text" size='mini' @click='handleAnalysisDownload(`success`)'>(导出)</el-button>条清单
+            本月已导入<span
+                >{{ monthInsertSuccessCount + monthInsertErrorCount
+                }}<el-button v-if="monthInsertSuccessCount" type="text" size="mini" @click="router2bill(`month`)"
+                    >(查看)</el-button
+                ></span
+            >条清单
         </p>
         <p>
-            结算失败清单<span>{{monthInsertError.length}}</span>
-            <el-button v-if='monthInsertError.length' type="text" size='mini' @click='handleAnalysisDownload(`success`)'>(导出)</el-button>条清单
+            本月已导入结算成功清单<span>{{ monthInsertSuccessCount }}</span>
+            <el-button v-if="monthInsertSuccessCount" type="text" size="mini" @click="router2bill(`monthSuccess`)"
+                >(查看)</el-button
+            >条清单
         </p>
         <p>
-            未找到受理用户<span>{{monthInsertLose.length}}</span>
-            <el-button v-if='monthInsertLose.length' type="text" size='mini' @click='handleAnalysisDownload(`success`)'>(导出)</el-button>条
+            本月已导入结算失败清单<span>{{ monthInsertErrorCount }}</span>
+            <el-button v-if="monthInsertErrorCount" type="text" size="mini" @click="router2bill(`monthError`)"
+                >(查看)</el-button
+            >条清单
+        </p>
+        <p>
+            所有结算未找到受理用户<span>{{ notFoundUserCount }}</span>
+            <el-button
+                v-if="notFoundUserCount"
+                type="text"
+                size="mini"
+                :loading="outputLoading === 'notFoundUserCount'"
+                @click="handleAnalysisDownload(`notFoundUserCount`)"
+                >(导出)</el-button
+            >条
         </p>
         <!-- <p>
     未结算清单数量<span>{{accept_count}}</span>条<el-button v-if='!loading' type="text" size='mini' @click='handleAnalysisDownload(`success`)'>导出</el-button>
@@ -49,40 +85,19 @@
         <!--         <p>
             实际结算<span>{{success.length}}</span>条<el-button v-if='!loading' type="text" size='mini' @click='handleAnalysisDownload(`error`)'>导出</el-button>。
         </p> -->
-        <p>
-            未结算清单<span>999</span>条<el-button v-if='!loading' type="text" size='mini' @click='handleAnalysisDownload(`lose`)'>导出</el-button>
-        </p>
+        <!--         <p>
+            未结算清单<span>{{accept_count - }}</span>条<el-button
+                v-if="!loading"
+                type="text"
+                size="mini"
+                @click="handleAnalysisDownload(`lose`)"
+                >导出</el-button
+            >
+        </p> -->
         <div>
-            <el-button type="success" @click="submitUpload">更新数据</el-button>
+            <el-button type="success" @click="handleUpdate">更新数据</el-button>
             <el-button type="default" @click="onRouterList">查看历史数据</el-button>
         </div>
-        <!--         <div class="data-analysis">
-    <el-tabs v-model="analysisActiveName" @tab-click="handleAnalysisClick">
-        <el-tab-pane :label="`全部数据 (${datas.length})`" name="all">
-        </el-tab-pane>
-        <el-tab-pane :label="`成功数据 (${success.length})`" name="success">
-        </el-tab-pane>
-        <el-tab-pane :label="`失败数据 (${errors.length})`" name="errors">
-        </el-tab-pane>
-        <el-tab-pane :label="`未找到数据 (${notfound.length})`" name="lose">
-        </el-tab-pane>
-    </el-tabs>
-    <el-button class='button' :loading='outputLoading' type="success" @click="handleAnalysisDownload" size='mini'>导出该分类数据</el-button>
-</div>
-<div class="table-box flex1" ref='tableBox'>
-    <template v-if='tableHeight'>
-        <el-table :data="splitDatas" style="width: 100%" :height="tableHeight" v-if='analysisActiveName !== "lose"'>
-            <el-table-column v-for="(v, i) in items" :prop="i" :label="i"> </el-table-column>
-            <el-table-column prop="no" label="购物车流水号"> </el-table-column>
-        </el-table>
-        <el-table :data="splitDatas" style="width: 100%" :height="tableHeight" v-else>
-            <el-table-column v-for="(v, i) in notfoundItems" :prop="i" :label="v"> </el-table-column>
-            <el-table-column prop="no" label="购物车流水号"> </el-table-column>
-        </el-table>
-    </template>
-</div>
-<el-pagination class='pagination' @current-change='handleCurrentChange' :hide-on-single-page="false" background layout="prev, pager, next" :current-page.sync='page' :total="splitDatas.length">
-</el-pagination> -->
     </div>
 </template>
 <script>
@@ -92,10 +107,20 @@ import xlsx from 'xlsx'
 const fs = require('fs')
 // const { readFileSync } = fs
 
-
 export default {
     data() {
         return {
+            monthInsertSuccessCount: 0, //当月插入成功数
+            monthInsertErrorCount: 0, //当月插入失败数
+            notFoundUserCount: 0, //没有找到受理用户的结算清单
+            importSuccessCount: 0, //导入成功数量
+            importErrorCount: 0, //导入失败
+            package: [], //需要结算的受理清单套餐
+            // outputLoading: '', //用来判断是否需要组装下载数据
+            accept_count_arr: [], //本月结算的清单
+            insertSuccessCount: 0, //写入成功的条数
+            insertError: [], //插入失败的数据
+
             notFoundUserMember: [], //没有找到action_id的数据
             monthInsertData: [], //本月导入的数据
             outputLoading: false,
@@ -103,8 +128,6 @@ export default {
             qudao: '',
             analysisActiveName: 'all',
             tableNum: [], //导入的xlxs
-            insertError: [], //插入失败的数据
-            insertSuccess: [], //插入成功的数据
             fileList: [],
             datas: [], //所有
             success: [], //成功条数
@@ -114,19 +137,19 @@ export default {
             accept_length: 0, //需要受理的清单数
             page: 1,
             items: {
-                '产品类型': '',
-                '佣金结算段落': '',
-                '佣金结算策略': '',
-                '佣金结算类型': '',
+                产品类型: '',
+                佣金结算段落: '',
+                佣金结算策略: '',
+                佣金结算类型: '',
                 '佣金结算金额（元）': '',
-                '原因': '',
-                '发展套餐名': '',
-                '是否成功结算': '',
-                '用户ID': '',
-                '用户号码': '',
-                '订单号': '',
-                '订单竣工时间': '',
-                '账期': '',
+                原因: '',
+                发展套餐名: '',
+                是否成功结算: '',
+                用户ID: '',
+                用户号码: '',
+                订单号: '',
+                订单竣工时间: '',
+                账期: ''
             },
             notfoundItems: {
                 no: '购物车流水号',
@@ -163,48 +186,37 @@ export default {
         }
     },
     computed: {
-        monthInsertError() {
-            // 该月写入的失败数据
-            return this.monthInsertData.filter(e => e.status == 0)
+        firstDay() {
+            return dayjs()
+                .startOf('month')
+                .unix()
         },
-        monthInsertSuccess() {
-            // 该月写入的成功数据
-            return this.monthInsertData.filter(e => e.status == 1)
-        },
-        monthInsertLose() {
-            // 该月写入的没找到action_id的数据
-            return this.monthInsertData.filter(e => e.not_found_user == 1)
-        },
-        /* currentData() {
-             // 显示的数据粗
-             const k = this.analysisActiveName
-             if (k === 'success') {
-                 return this.success
-             } else if (k === 'errors') {
-                 return this.errors
-             } else if (k === 'all') {
-                 // 没有找到的数据
-                 return this.datas
-             } else {
-                 return this.notfound
-             }
-         },*/
-        /* splitDatas() {
-             // 分页显示数据
-             const limit = 100
-             let start = (this.page - 1) * limit - 1
-             if (start < 0) {
-                 start = 0
-             }
-
-
-             return this.currentData.slice(start, start + limit)
-         },*/
+        // 获取本月导入成功的数据
+        lastDay() {
+            return dayjs()
+                .endOf('month')
+                .unix()
+        }
     },
     created() {
         this.onFetchPackageDatas()
     },
     methods: {
+        router2bill(type) {
+            const query = {
+                created: new Date().toString()
+            }
+
+            if (type === 'monthSuccess') {
+                query.status = 1
+            } else if (type === 'monthError') {
+                query.status = 0
+            }
+            this.$router.push({ name: 'bill.list', query })
+        },
+        handleUpdate() {
+            // 更新所有数据
+        },
         onRouterList() {
             this.$router.push('/bill/list')
         },
@@ -214,63 +226,74 @@ export default {
                 console.log({ err, res })
             })
         },
+        // 获取本月待计算受理数
         onFetchPackageDatas() {
             const sql = 'select * from package'
-
             this.$db.all(sql, (err, res) => {
                 console.log(err, res)
                 if (!err) {
+                    this.package = res
                     this.onFetchSettle(res)
                 }
             })
-            // 获取本月导入成功的数据
 
-            const firstDay = dayjs().startOf('month').unix()
-            const lastDay = dayjs().endOf('month').unix()
+            this.onFetchMonthCount()
+        },
+        onFetchMonthCount() {
+            // 获取本月导入的数据条数
 
-            const month_sql = `select * from bill where created between ${firstDay} and ${lastDay}`
-            this.$db.all(month_sql, (err, res = []) => {
-                console.log('----------------------', err, res)
-                this.monthInsertData = res
+            const month_sql = `select count(*) as count from bill where created between ${this.firstDay} and ${this.lastDay}`
+
+            this.$db.get(`${month_sql} and status=1`, (err, res = []) => {
+                this.monthInsertSuccessCount = res.count
+            })
+
+            this.$db.get(`${month_sql} and status=0`, (err, res = []) => {
+                this.monthInsertErrorCount = res.count
+            })
+            // 获取没有找到对于业务号码的结算数据
+            this.$db.get(`${month_sql} and not_found_user=1`, (err, res = []) => {
+                this.notFoundUserCount = res.count
             })
         },
 
+        // 获取本月待计算受理数
         async onFetchSettle(vals) {
-            // 获取本月待计算受理数
             // 1. 先通过套餐获取对应的受理清单（结算次数）
             // 2. 循环所有，判断月份
-
-
-            console.log('onFetchSettle', vals)
+            let accept_arr = []
             for (var i = vals.length - 1; i >= 0; i--) {
-
                 let { name, count } = vals[i]
-                console.log(name, count)
-                const sql = `select a.date_end,a.js_count from accept as a where a.js_count < ${count} and product_main='${name}'`
+                // console.log(name, count)
+                // a.date_end,a.js_count
+                const sql = `select a.* from accept as a where a.js_count < ${count} and product_main='${name}'`
                 const data = await new Promise(resolve => {
-                    this.$db.all(sql, (err, res) => {
+                    this.$db.all(sql, (err, res = []) => {
                         if (!err) {
                             // console.log({ vals }, i)
                             resolve(res)
                             // console.log(day, now, law, count)
-
                         } else {
                             resolve([])
                         }
-
                     })
-
                 })
 
-                console.log({ data }, i)
-                this.onCalcCount(vals[i], data)
-
+                if (this.outputLoading === 'accept_count' || this.outputLoading === 'accept_length') {
+                    // 再获取当前acton所有结算清单
+                    let _data = await this.onCalcCountColums(vals[i], data)
+                    accept_arr.push(..._data)
+                } else {
+                    this.onCalcCount(vals[i], data)
+                }
             }
-
+            console.log({ accept_arr })
+            return accept_arr
         },
-        onCalcCount(item, vals) {
+        async onCalcCountColums(item, vals) {
             // 统计本月需要计算的数量
-            console.log({ item })
+            // console.log({ item })
+            let accept_count_arr = []
             let { name, count, law, id } = item
 
             const now = dayjs().format('YYYYMM')
@@ -278,13 +301,112 @@ export default {
             // 组装每月结算间隔
             law = law.toString().split(',')
             law.length = count
-            law = Array.from(law).map(e => ((e | 0) || 1))
+            law = Array.from(law).map(e => e | 0 || 1)
+            console.log({ law })
+            let result = 0 //总结算次数
+            let __nums = 0 //总结算清单数
+
+            // count 导出有月份的清单
+            let __flag = this.outputLoading === 'accept_count'
+            // 重置一下
+            console.log({ vals })
+            try {
+                for (let i = 0; i < vals.length; i++) {
+                    let e = vals[i]
+
+                    // 竣工时间
+                    let day = dayjs(e.date_end * 1000).format('YYYYMM')
+
+                    // 计算本月该数据该计算几次，暂时按照个月结算。月月结算
+                    // let _count = now - day
+
+                    // 判断计算次数, 和对应规则。以及判断是否对应结算规则
+                    let _law = law.slice(0, count)
+
+                    // 结算次数
+                    let __count = __flag ? [] : 0
+
+                    for (let i = 0; i < _law.length; i++) {
+                        day = (day | 0) + (_law[i] | 0)
+                        let flag = day <= now
+
+                        // 月份小于规则，结算数量就+1，反之跳出
+                        if (flag) {
+                            if (__flag) {
+                                __count.push(day)
+                            } else {
+                                __count++
+                            }
+                        } else {
+                            break
+                        }
+                    }
+
+                    e.import_date = dayjs.unix(e.import_date).format('YYYY-MM-DD hh:ss:mm')
+                    e.created = dayjs.unix(e.created).format('YYYY-MM-DD hh:ss:mm')
+                    e.date_end = dayjs.unix(e.date_end).format('YYYY-MM-DD hh:ss:mm')
+
+                    if (__flag) {
+                        // console.log('找出结算成功的数据 __count', __count)
+                        if (__count.length) {
+                            // 找出结算成功的数据
+                            let sql = `select date from bill where user_number='${e.action_no}' and status=1`
+
+                            const qd = await new Promise(resolve => {
+                                this.$db.all(sql, (err, res) => {
+                                    // console.log('找出结算成功的数据', sql, res)
+
+                                    if (!err) {
+                                        // console.log({ vals }, i)
+                                        resolve(res.map(e => e.date * 1))
+                                        // console.log(day, now, law, count)
+                                    } else {
+                                        resolve([])
+                                    }
+                                })
+                            })
+                            // 筛选出已存在的
+                            __count = __count.filter(e => !qd.includes(e * 1))
+
+                            // console.log('找出结算成功的数据', qd, __count)
+                            accept_count_arr.push(
+                                ...__count.map(e2 => {
+                                    e.date = e2
+                                    return e
+                                })
+                            )
+                        }
+                    } else {
+                        // 减去以结算的
+                        __count = __count - e.js_count
+
+                        if (__count > 0) {
+                            accept_count_arr.push(e)
+                        }
+                    }
+                }
+            } catch (err) {
+                console.log(err)
+            }
+
+            return accept_count_arr
+        },
+        onCalcCount(item, vals) {
+            // 统计本月需要计算的数量
+            // console.log({ item })
+            let { name, count, law, id } = item
+
+            const now = dayjs().format('YYYYMM')
+
+            // 组装每月结算间隔
+            law = law.toString().split(',')
+            law.length = count
+            law = Array.from(law).map(e => e | 0 || 1)
             console.log({ law })
             let result = 0 //总结算次数
             let __nums = 0 //总结算清单数
 
             vals.forEach(e => {
-
                 // 竣工时间
                 let day = dayjs(e.date_end * 1000).format('YYYYMM')
 
@@ -300,19 +422,13 @@ export default {
                     day = (day | 0) + (_law[i] | 0)
                     let flag = day <= now
 
-                    if (name === '5G畅享199元套餐201910') {
-
-                        console.log('5G畅享199元套餐201910------------', (day | 0) + (_law[i] | 0), day, flag)
-                    }
                     // 月份小于规则，结算数量就+1，反之跳出
                     if (flag) {
                         __count++
                     } else {
-                        break;
-
+                        break
                     }
                 }
-
 
                 // 减去以结算的
                 __count = __count - e.js_count
@@ -329,100 +445,144 @@ export default {
             this.accept_length += __nums
             // this.$set(this.datas[idx], '__count', result)
             // this.$set(this.datas[idx], '__nums', __nums)
-
         },
         handleCurrentChange(page) {
             this.page = page
         },
-        handleAnalysisDownload() {
-            const type = this.analysisActiveName
-            let datas = this.currentData
+        async onFetchAccept(flag) {
+            // 本月需要处理的受理清单
+            // flag = 'accept_count', 'accept_length'
+            // 获取受理清单
+            console.log({ flag })
+            try {
+                let accept_count_arr = []
+                if (this.package.length) {
+                    this.outputLoading = flag
+                    accept_count_arr = await this.onFetchSettle(this.package)
+                } else {
+                    return
+                }
+                console.log({ accept_count_arr })
 
+                let __flag = flag === 'accept_count'
+
+                const json = { ...this.notfoundItems, user_number: '副卡(结算号)', js_count: '已结算次数' }
+                let title = ''
+                if (__flag) {
+                    json['date'] = '账期'
+                    title = '带月份的受理清单'
+                } else {
+                    title = '需要结算的清单'
+                }
+                //
+
+                if (accept_count_arr.length < 1) {
+                    return this.$message({
+                        showClose: true,
+                        message: '当前分类下面没有数据哦',
+                        type: 'warning'
+                    })
+                }
+
+                let datas = this.parseAoaData(accept_count_arr, json)
+
+                // 下载
+                this.onDownload(datas, `[${title}]`)
+            } catch (err) {
+                this.outputLoading = ''
+            }
+        },
+        async handleAnalysisDownload(type) {
+            console.log('handleAnalysisDownload', type)
+            let title = ''
+            let datas = []
+            if (type === 'insertError') {
+                // 受理清单
+                title = '[结算清单写入失败数据]'
+                datas = this.insertError
+            } else if (type === 'notFoundUserCount') {
+                title = '[有结算清单,没有受理清单]'
+
+                const sql = `select * from bill where not_found_user = 1`
+                datas = await new Promise(resolve => {
+                    this.$db.run(sql, (err, res) => {
+                        console.log('onNotFoundUserMember', { err, res })
+                        resolve(res || [])
+                    })
+                })
+            }
+            // return false
 
             if (datas.length < 1) {
                 return this.$message({
                     showClose: true,
                     message: '当前分类下面没有数据哦',
                     type: 'warning'
-                });
+                })
             }
-            this.outputLoading = true
-            let txt = '分析数据-'
+            this.outputLoading = type
 
-
-            if (type === 'all') {
-                txt += '全部数据'
-            } else if (type === 'success') {
-                txt += '成功数据'
-            } else if (type === 'errors') {
-                txt += '失败数据'
-            } else if (type === 'lose') {
-                txt += '未找到数据'
+            // let excelType = 'json'
+            const json = {
+                ...this.columns,
+                error: '失败原因'
             }
+            datas = this.parseAoaData(datas, json)
 
-
-            let excelType = 'json'
-            if (type === 'lose') {
-
-                datas = this.parseAoaData(datas)
-                excelType = 'aoa'
-
-            } else {
-                // datas = this.parseJsonData(datas)
-            }
             // 下载
-            const name = `[${txt}]`
+            const name = `[${title}]`
             const book_name = 'book_name'
             console.log(datas)
 
-            download.excel2(datas, name, book_name, excelType).then(res => {
-                this.outputLoading = false
-                console.log(res)
-                this.$message({
-                    showClose: true,
-                    message: `数据表格创建${!res ? '成功' : '失败'}`,
-                    type: !res ? 'success' : 'error'
-                });
-
-            }).catch(err => {
-                this.outputLoading = false
-                console.log(err)
-            })
-
-
+            this.onDownload(datas, name)
         },
-        parseAoaData(datas) {
+        onDownload(datas, name, book_name = 'book_name', excelType = 'aoa') {
+            download
+                .excel2(datas, name, book_name, excelType)
+                .then(res => {
+                    this.outputLoading = ''
+                    console.log(res)
+                    this.$message({
+                        showClose: true,
+                        message: `数据表格创建${!res ? '成功' : '失败'}`,
+                        type: !res ? 'success' : 'error'
+                    })
+                })
+                .catch(err => {
+                    this.outputLoading = ''
+                    console.log(err)
+                })
+        },
+        parseAoaData(datas, json = '') {
             // json转成execl需要的数组
 
-            const line1 = Object.values(this.notfoundItems)
-            const keys = Object.keys(this.notfoundItems)
-            console.log(line1, keys)
+            const line1 = Object.values(json || this.notfoundItems)
+            const keys = Object.keys(json || this.notfoundItems)
+            // console.log(line1, keys)
+            // console.log(datas)
             datas = datas.map(v => {
-                return keys.map(k => v[k])
+                return keys.map(k => {
+                    console.log({ k })
+                    if (k === 'error') {
+                        if (/UNIQUE/i.test(v[k])) {
+                            return '数据已存在'
+                        }
+                    }
+                    return v[k]
+                })
             })
             datas.unshift(line1)
-            console.log(datas)
+            // console.log(datas)
             return datas
         },
         parseJsonData() {
             // json转数据
-
         },
         onChange(e) {
             // 文件发生变化
             console.log('onChange', e)
         },
         submitUpload() {
-
-            /*console.log(this.$refs.upload)
-            const upload = this.$refs.upload
-
-            const input = upload.$el.querySelector('.el-upload__input')
-            console.log(input.files)
-            window.inputs = input
-
-            this.fileList = input.files
-*/
             let fileList = this.$electron.remote.dialog.showOpenDialog({
                 properties: ['openFile', 'multiSelections'],
                 filters: { name: 'xlsx', extensions: ['xlsx', 'xls'] }
@@ -432,29 +592,20 @@ export default {
                 this.$message({
                     message: '没有获取到相关文件',
                     type: 'error'
-                });
+                })
                 return
             }
             this.loading = true
+
             this.tableNum = fileList
 
             fileList.forEach((e, i) => {
                 this.onOpenFile(e, i)
             })
 
-            this.loading = false
-            this.$message({
-                showClose: true,
-                message: '数据解析完毕',
-                type: 'success'
-            });
-
             // this.onOpenFile(input.files)
-
         },
         onParseSuccess(key) {
-
-
             let arr = []
             const json = xlsx.utils.sheet_to_json(this.result.Sheets[key])
 
@@ -464,20 +615,8 @@ export default {
                 this.errors = json
                 console.log({ json })
             }
-
         },
         onOpenFile(path, i) {
-            // return new Promise((resolve, reject) => {
-
-            // this.$electron.shell.openItem(path)
-            /*    let x = this.$electron.remote.dialog.showOpenDialog({
-                    properties: ['openFile'],
-                    filters: { name: 'xlxs', extensions: ['xlsx', 'xls'] }
-                })
-                console.log(x, xlsx)
-                if (!x) {
-                    return
-                }*/
             // 获取数据
             const excelBuffer = fs.readFileSync(path)
 
@@ -487,25 +626,12 @@ export default {
                 cellHTML: false
             })
 
-            console.log('result', result)
-
-            this.result = result
-            // const keys = Object.keys(result)
-            // const values = Object.values(result)
-
+            // this.result = result
             const now = dayjs().unix()
-            // 插入数据库
 
             // 分析数据
-            // this.onParseSuccess()
-            console.log(result)
             const _data = []
             result.SheetNames.forEach(key => {
-                console.log('TCL: result', key)
-                // const data = this.onParseSuccess(e)
-                // console.log(data)
-                // _data.push(...this.onParseSuccess(e))
-
                 let json = xlsx.utils.sheet_to_json(result.Sheets[key])
 
                 json = json.map(e => {
@@ -514,7 +640,13 @@ export default {
                     for (let k in this.columns) {
                         let v = this.columns[k]
                         if (v === '是否成功结算') {
-                            obj[k] = (e[v] === '成功') * 1
+                            let flag = (e[v] === '成功') * 1
+                            obj[k] = flag
+                            if (flag) {
+                                this.importSuccessCount++
+                            } else {
+                                this.importErrorCount++
+                            }
                         } else {
                             obj[k] = e[v]
                         }
@@ -525,19 +657,14 @@ export default {
 
                 // 插入数据库
 
-
                 if (key === '成功' || key === '失败') {
-                    if (key === '成功') {
-                        this.success = json
-                    } else if (key === '失败') {
-                        this.errors = json
-                        console.log({ json })
-                    }
+                    // if (key === '成功') {
+                    // } else if (key === '失败') {
+                    //     // console.log({ json })
+                    // }
                     _data.push(...json)
-
                 }
-                console.log({ json })
-
+                // console.log({ json })
             })
 
             // 分析未找到数据
@@ -562,7 +689,7 @@ export default {
             // 筛选数据
             this.handleParseLose()
             // })
-
+            this.loading = false
             // download.excel('xxx.xlxs', result2)
         },
         onInsertDatas(datas, now) {
@@ -578,19 +705,28 @@ export default {
                     datas.error = err.toString()
                     this.insertError.push(datas)
                 } else {
-                    this.insertSuccess.push(datas)
+                    this.insertSuccessCount++
+
                     // 更新acceptjs_count
                     const id = datas.user_number
-                    const sql = `update accept set js_count=js_count+1 where action_no='${id}'`
-                    this.$db.run(sql, (err) => {
+                    const sql = `update accept set js_count=js_count+1 where action_no='${id}' or user_number='${id}'`
+                    this.$db.run(sql, err => {
                         if (err) {
-                            const sql2 = `select a1 from related_user where a2='${id}' or a3='${id}' or a4='${id}'`
+                            console.log(id, '更新js_count失败')
+                            // 判断数据是否在副卡中
+                            const sql2 = `select a1 from related_user where a2='${id}' or a3='${id}' or a4='${id}' or a5='${id}' or a6='${id}'`
                             this.$db.get(sql2, (err, res) => {
+                                console.log(id, '查找副卡', res, err)
+
                                 if (err) {
+                                    // 不在副卡中就标记为未找到受理用户
                                     this.onNotFoundUserMember(datas)
                                 } else {
-                                    this.$db.run(sql, (err) => {
-                                        console.log(err)
+                                    // 找到就更新结算条数, js_count
+                                    const sql = `update accept set js_count=js_count+1, user_number='${id}' where action_no='${res.a1}'`
+                                    console.log('添加绑定副卡', res, sql)
+                                    this.$db.run(sql, err => {
+                                        // console.log(err)
                                         if (err) {
                                             this.onNotFoundUserMember(datas)
                                         }
@@ -645,7 +781,7 @@ export default {
         handleAnalysisClick(e) {
             console.log(e)
             // 数据分析tab点击事件
-        },
+        }
     }
 }
 </script>

@@ -1,19 +1,17 @@
-import fse from 'fs-extra';
-import path from 'path';
-import sq3 from 'sqlite3';
-import logger from './logger';
-import { docDir } from './settings';
+import fse from 'fs-extra'
+import path from 'path'
+import sq3 from 'sqlite3'
+import logger from './logger'
+import { docDir } from './settings'
 // 将数据存至系统用户目录，防止用户误删程序
-export const dbPath = path.join(docDir, 'data.sqlite3');
-fse.ensureFileSync(dbPath);
+export const dbPath = path.join(docDir, 'data.sqlite3')
+fse.ensureFileSync(dbPath)
 
 console.log(dbPath)
-const sqlite3 = sq3.verbose();
-const db = new sqlite3.Database(dbPath);
-
+const sqlite3 = sq3.verbose()
+const db = new sqlite3.Database(dbPath)
 
 db.serialize(() => {
-
     /*/ 受理表
      * no: '购物车流水号',
      * area: '地区',
@@ -31,8 +29,10 @@ db.serialize(() => {
      * remark: '备注',
      * import_date: '导入时间'
      * js_count 结算次数,
+     * related_user: 用户关联账号，
      */
-    db.run(`CREATE TABLE accept(
+    db.run(
+        `CREATE TABLE accept(
       id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
       no VARCHAR(255),
       area VARCHAR(255),
@@ -50,9 +50,15 @@ db.serialize(() => {
       remark VARCHAR(255),
       js_count INTEGER DEFAULT 0 NOT NULL,
       import_date VARCHAR(255),
+      user_number VARCHAR(255),
       UNIQUE(\`action_no\`)
-  )`, err => {
-        logger(err)
+  )`,
+        err => {
+            logger(err)
+        }
+    )
+    db.run(`CREATE INDEX user_number ON accept (user_number)`, err => {
+        console.log(err)
     })
     db.run(`CREATE INDEX js_count ON accept (js_count)`, err => {
         console.log(err)
@@ -72,7 +78,8 @@ db.serialize(() => {
      * law: 结算规律说明
      */
     // db.run(`drop table package`)
-    db.run(`CREATE TABLE package(
+    db.run(
+        `CREATE TABLE package(
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
      name VARCHAR(255) NOT NULL,
      count VARCHAR(255) NOT NULL,
@@ -80,9 +87,11 @@ db.serialize(() => {
      law_desc VARCHAR(255),
      UNIQUE(\`name\`)
      
-    )`, err => {
-        logger(err);
-    });
+    )`,
+        err => {
+            logger(err)
+        }
+    )
 
     /**
      * 结算表
@@ -104,7 +113,8 @@ db.serialize(() => {
     // db.run(`drop table bill`, err => {
     //     console.log(err)
     // })
-    db.run(`create table bill(
+    db.run(
+        `create table bill(
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
 date varchar(200),
 order_id varchar(200),
@@ -123,9 +133,11 @@ branch varchar(200),
 created varchar(200),
      UNIQUE(\`order_id\`)
 
-    )`, err => {
-        logger(err);
-    });
+    )`,
+        err => {
+            logger(err)
+        }
+    )
 
     db.run(`create index date ON bill (date)`, err => {
         console.log(err)
@@ -149,25 +161,38 @@ created varchar(200),
 
     /**
      * 用户关联表
+          a1: '业务号码',
+          a2:'主卡',
+          a3: '副卡1',
+          a4: '副卡2',
+          a5: '副卡3',
+          a6: '副卡4'
      * @param  {[type]} err [description]
      * @return {[type]}     [description]
      */
-    db.run(`create table related_user(
+    db.run(
+        `create table related_user(
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
 a1 varchar(200) NOT NULL,
 a2 varchar(200),
 a3 varchar(200),
 a4 varchar(200),
 a5 varchar(200),
+a6 varchar(200),
      UNIQUE(\`a1\`)
 
-    )`, err => {
-        logger(err);
-    });
+    )`,
+        err => {
+            logger(err)
+        }
+    )
 
-    db.run(`create index a ON related_user (a2,a3,a4,a5)`, err => {
+    db.run(`create index a1 ON related_user (a1)`, err => {
         console.log(err)
     })
-});
+    db.run(`create index a ON related_user (a2,a3,a4,a5,a6)`, err => {
+        console.log(err)
+    })
+})
 
-export default db;
+export default db
