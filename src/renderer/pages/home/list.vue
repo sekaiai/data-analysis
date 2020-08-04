@@ -62,6 +62,15 @@
                 >共有<b>{{ total }}</b
                 >条数据</small
             >
+            <el-button
+                v-if="total > 0"
+                style="margin-left: 10px;"
+                type="success"
+                :loading="outputLoading"
+                @click="handleOutputDatas"
+                size="mini"
+                >导出查询结果</el-button
+            >
         </div>
 
         <div class="table-box flex1" ref="tableBox">
@@ -114,17 +123,18 @@
 </template>
 <script>
 import dayjs from 'dayjs'
+import download from '@/utils/download.js'
 export default {
     name: 'blist',
     data() {
         return {
+            outputLoading: false, //导出中
             datas: [],
             total: 0,
             page: 1,
             not_found_user: '', //没有找到业务ID
             status: '', //-1:全部，1:成功,0失败，2:没找到业务ID
             status_arr: [
-                { i: -1, v: '全部' },
                 { i: 1, v: '结算成功' },
                 { i: 0, v: '结算失败' }
             ],
@@ -156,11 +166,7 @@ export default {
     },
     filters: {
         parseDate(v) {
-            return dayjs(v * 1000).format('YYYY-MM-DD hh:ss:mm')
-            // let date = new Date(v * 1)
-            // this.$logger(v, date)
-            // return `${date.getFullYear()}年${date.getMonth() +
-            //     1}月${date.getDay()}日 ${date.getHours()}时${date.getMinutes()}分${date.getSeconds()}秒`
+            return dayjs.unix(v).format('YYYY-MM-DD hh:ss:mm')
         }
     },
     created() {
@@ -176,6 +182,92 @@ export default {
         this.onFetchDatasCount()
     },
     methods: {
+        handleOutputDatas() {
+            this.outputLoading = true
+            let where = this.onParseSearchSQL()
+            const sql = `select b.*,a.acceptor,a.user,a.action_no as acno from bill b left join accept a on (a.user_number=b.user_number or a.action_no=b.user_number) where  ${where}`
+            this.$db.all(sql, (err, res = []) => {
+                this.$logger({ res, sql })
+                // this.datas = res
+                if (res && res.length > 0) {
+                    let json = {
+                        date: '账期',
+                        order_id: '订单号',
+                        complete_date: '订单竣工时间',
+                        commission_policy: '佣金结算策略',
+                        commission_type: '佣金结算类型',
+                        commission_money: '佣金结算金额（元）',
+                        package_name: '发展套餐名',
+                        product_name: '产品类型',
+                        user_id: '用户ID',
+                        user_number: '用户号码',
+                        status: '是否成功结算',
+                        cause: '原因',
+                        branch: '网点名称',
+                        acceptor: '受理人',
+                        user: '揽收人',
+                        acno: '是否结算成功（是否有对应受理清单）'
+                    }
+
+                    let datas = this.parseAoaData(res, json)
+                    const name = `导出查询结算清单`
+                    const book_name = 'book_name'
+                    this.$logger(datas)
+
+                    this.onDownload(datas, name)
+                } else {
+                    this.$message({
+                        showClose: true,
+                        message: `没有相关数据或获取数据失败`,
+                        type: 'error'
+                    })
+                    this.outputLoading = false
+                }
+            })
+        },
+        onDownload(datas, name, book_name = 'book_name', excelType = 'aoa') {
+            download
+                .excel2(datas, name, book_name, excelType)
+                .then(res => {
+                    this.outputLoading = false
+                    this.$logger(res)
+                    this.$message({
+                        showClose: true,
+                        message: `数据表格创建${!res ? '成功' : '失败'}`,
+                        type: !res ? 'success' : 'error'
+                    })
+                })
+                .catch(err => {
+                    this.outputLoading = false
+                    this.$logger(err)
+                })
+        },
+        parseAoaData(datas, json = '') {
+            // json转成execl需要的数组
+
+            const line1 = Object.values(json || this.notfoundItems)
+            const keys = Object.keys(json || this.notfoundItems)
+            // this.$logger(line1, keys)
+            // this.$logger(datas)
+            datas = datas.map(v => {
+                return keys.map(k => {
+                    this.$logger({ k })
+                    if (k === 'error') {
+                        if (/UNIQUE/i.test(v[k])) {
+                            return '数据已存在'
+                        }
+                    } else if (k === 'status') {
+                        return v[k] > 0 ? '成功' : '失败'
+                    } else if (k === 'acno') {
+                        return !!v[k] ? '成功' : '失败'
+                    }
+                    return v[k]
+                })
+            })
+            datas.unshift(line1)
+            // this.$logger(datas)
+            return datas
+        },
         handleCurrentChange(page) {
             this.page = page
             this.onFetchDatas()
@@ -187,11 +279,11 @@ export default {
             let where = []
             // 按条件查询查询
             if (this.status !== '') {
-                where.push(`status='${this.status}'`)
+                where.push(`b.status='${this.status}'`)
             }
             if (this.date && this.date !== '') {
                 let a = dayjs(this.date).format('YYYYMM')
-                where.push(`date = ${a}`)
+                where.push(`b.date = ${a}`)
             }
             if (this.created && this.created !== '') {
                 let date = this.created
@@ -201,32 +293,32 @@ export default {
                 let b = dayjs(date)
                     .endOf('month')
                     .unix()
-                where.push(`created between ${a} and ${b}`)
+                where.push(`b.created between ${a} and ${b}`)
             }
             if (this.not_found_user && this.not_found_user !== '') {
-                where.push(`not_found_user = 1`)
+                where.push(`b.not_found_user = 1`)
             }
             if (this.package_name !== '') {
-                where.push(`package_name = '${this.package_name}'`)
+                where.push(`b.package_name = '${this.package_name}'`)
             }
 
             if (this.user_number !== '') {
-                where.push(`user_number like '%${this.user_number}%'`)
+                where.push(`b.user_number like '%${this.user_number}%'`)
             }
             if (this.order_id !== '') {
-                where.push(`order_id like '%${this.order_id}%'`)
+                where.push(`b.order_id like '%${this.order_id}%'`)
             }
 
             // 查询开始结束
             if (this.branch) {
-                where.push(`branch = '${this.branch}'`)
+                where.push(`b.branch = '${this.branch}'`)
             }
 
             if (where.length > 0) {
                 where = where.join(' and ')
-                where = `where ${where}`
+                where = `${where}`
             } else {
-                where = ''
+                where = 'true'
             }
             return where
         },
@@ -234,7 +326,7 @@ export default {
             let start = (this.page - 1) * 20
             let limit = `limit ${start}, 20`
             let where = this.onParseSearchSQL()
-            const sql = `select * from bill ${where} ${limit}`
+            const sql = `select b.* from bill b where ${where} ${limit}`
             this.$db.all(sql, (err, res = []) => {
                 this.$logger({ res, sql })
                 this.datas = res
@@ -242,10 +334,10 @@ export default {
         },
         onFetchDatasCount() {
             let where = this.onParseSearchSQL()
-            const sql = `select count(*) as total from bill ${where}`
+            const sql = `select count(*) as total from bill b where ${where}`
 
             this.$db.get(sql, (err, res) => {
-                // this.$logger({ count: res })
+                this.$logger({ count: res, err })
                 if (!err && res) {
                     this.total = res.total
                 }
@@ -258,6 +350,10 @@ export default {
                 this.created = '' //创建时间
                 this.branch = '' //网点
                 this.user_number = '' //业务号码
+                this.not_found_user = ''
+                this.package_name = ''
+                this.user_number = ''
+                this.order_id = ''
             }
             this.page = 1
 

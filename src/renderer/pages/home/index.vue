@@ -1,6 +1,7 @@
 <template>
     <div id="home" v-loading.lock="loading" :element-loading-text="`正在解析数据`">
         <div class="clear" @click="handleClearData">清空数据表</div>
+
         <div class="title-line">结算分析</div>
         <div class="form-line">
             <el-button type="primary" @click="submitUpload">导入结算清单</el-button>
@@ -54,19 +55,31 @@
                 }}<el-button v-if="monthInsertSuccessCount" type="text" size="mini" @click="router2bill(`month`)"
                     >(查看)</el-button
                 ></span
-            >条清单
+            >结算清单
         </p>
         <p>
-            本月已导入结算成功清单<span>{{ monthInsertSuccessCount }}</span>
+            本月导入（成功）<span>{{ monthInsertSuccessCount }}</span>
             <el-button v-if="monthInsertSuccessCount" type="text" size="mini" @click="router2bill(`monthSuccess`)"
                 >(查看)</el-button
-            >条清单
+            >结算清单
         </p>
+
         <p>
-            本月已导入结算失败清单<span>{{ monthInsertErrorCount }}</span>
+            本月导入（失败）<span>{{ monthInsertErrorCount }}</span>
             <el-button v-if="monthInsertErrorCount" type="text" size="mini" @click="router2bill(`monthError`)"
                 >(查看)</el-button
-            >条清单
+            >结算清单
+        </p>
+        <p>
+            本月结算（成功）<span>{{ monthOutSuccess }}</span>
+            <el-button
+                v-if="monthOutSuccess"
+                :loading="outputLoading === 'monthOutSuccess'"
+                type="text"
+                size="mini"
+                @click="handleAnalysisDownload('monthOutSuccess')"
+                >(导出)</el-button
+            >结算清单
         </p>
         <p>
             所有结算未找到受理用户<span>{{ notFoundUserCount }}</span>
@@ -110,10 +123,12 @@ const fs = require('fs')
 // const { readFileSync } = fs
 
 export default {
+    name: 'bill',
     data() {
         return {
             uploadloading: false, //重新统计的加载按钮
             monthInsertSuccessCount: 0, //当月插入成功数
+            monthOutSuccess: 0, //本月导入结算成功的清单数量
             monthInsertErrorCount: 0, //当月插入失败数
             notFoundUserCount: 0, //没有找到受理用户的结算清单
             importSuccessCount: 0, //导入成功数量
@@ -345,16 +360,22 @@ export default {
             const month_sql = `select count(*) as count from bill where created between ${this.firstDay} and ${this.lastDay}`
 
             this.$db.get(`${month_sql} and status=1`, (err, res = []) => {
-                this.monthInsertSuccessCount = res.count
+                if (res) this.monthInsertSuccessCount = res.count
             })
 
             this.$db.get(`${month_sql} and status=0`, (err, res = []) => {
-                this.monthInsertErrorCount = res.count
+                if (res) this.monthInsertErrorCount = res.count
             })
             // 获取没有找到对于业务号码的结算数据
             this.$db.get(`select count(*) as count from bill where not_found_user=1`, (err, res = []) => {
                 console.log('notfound', { err, res })
-                this.notFoundUserCount = res.count
+                if (res) this.notFoundUserCount = res.count
+            })
+            // 获取本月结算成公的。
+            let oq = `select count(b.id) as count from bill b left join accept a on (a.user_number=b.user_number or a.action_no=b.user_number) where a.action_no is not null and b.created between ${this.firstDay} and ${this.lastDay}`
+            this.$db.get(oq, (err, res) => {
+                console.log({ res, err })
+                if (res) this.monthOutSuccess = res.count
             })
         },
 
@@ -594,7 +615,13 @@ export default {
             }
         },
         async handleAnalysisDownload(type) {
+            this.outputLoading = type
             this.$logger('handleAnalysisDownload', type)
+
+            let json = {
+                ...this.columns
+            }
+
             let title = ''
             let datas = []
             if (type === 'insertError') {
@@ -611,23 +638,34 @@ export default {
                         resolve(res || [])
                     })
                 })
+            } else if (type === 'monthOutSuccess') {
+                title = `[${dayjs().format('YYYYMM')}导入结算清单，结算成功]`
+
+                const sql = `select b.*,a.acceptor,a.user from bill b left join accept a on (a.user_number=b.user_number or a.action_no=b.user_number) where a.acceptor is not null and b.created between ${this.firstDay} and ${this.lastDay} group by b.id`
+
+                datas = await new Promise(resolve => {
+                    this.$db.all(sql, (err, res) => {
+                        this.$logger('导入结算清单，结算成功', { err, res })
+                        resolve(res || [])
+                    })
+                })
             }
             // return false
 
             if (datas.length < 1) {
+                this.outputLoading = ''
                 return this.$message({
                     showClose: true,
                     message: '当前分类下面没有数据哦',
                     type: 'warning'
                 })
             }
-            this.outputLoading = type
-
-            // let excelType = 'json'
-            const json = {
-                ...this.columns,
-                error: '失败原因'
+            if (type !== 'monthOutSuccess') {
+                json.error = '失败原因'
+            } else {
+                json = { ...json, acceptor: '受理人', user: '揽收人' }
             }
+
             datas = this.parseAoaData(datas, json)
 
             // 下载
@@ -892,6 +930,15 @@ export default {
         handleAnalysisClick(e) {
             this.$logger(e)
             // 数据分析tab点击事件
+        },
+        handleMonthAccept() {
+            // 本月已结算的
+            // 1. 查询所有本月结算清单关联结算表
+            // const month_sql = `select *  from(select b.*,a.acceptor,a.user from bill b left join accept a on a.action_no=b.user_number where b.date=202006 union select b.*,a.acceptor,a.user from bill b left join accept a on a.user_number=b.user_number where b.date=202006 ) where created between ${this.firstDay} and ${this.lastDay} group by id`
+            const s = `select b.*,a.acceptor,a.user from bill b left join accept a on (a.user_number=b.user_number or a.action_no=b.user_number) where a.action_no is not null and b.created between ${this.firstDay} and ${this.lastDay} group by b.id`
+            this.$db.all(s, (err, res) => {
+                console.log(err, res)
+            })
         }
     }
 }
