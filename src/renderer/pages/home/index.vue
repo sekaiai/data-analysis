@@ -234,14 +234,15 @@ export default {
             const sql = `select user_number,count(user_number) as count from bill group by user_number`
             const bills = await new Promise(resolve => {
                 this.$db.all(sql, (err, res = []) => {
-                    // this.$logger(err, res)
+                    this.$logger(err, res)
                     // let _sql = ``
                     resolve(res)
                 })
             })
             for (var i = 0; i < bills.length; i++) {
                 let item = bills[i]
-                // 1. 先查询
+                this.$logger({ item })
+                // 1. 先查询受理清单是否存在
                 let hasdata = await new Promise(resolve => {
                     const _sql = `select action_no from accept where action_no=${item.user_number}`
 
@@ -251,8 +252,8 @@ export default {
                     })
                 })
                 this.$logger('222hasdata', hasdata)
+                // 存在更新数据
                 if (hasdata) {
-                    // 插入数据
                     let _sql = `update accept set js_count = ${item.count} where action_no = ${item.user_number}`
                     this.$db.run(_sql, (err, res) => {
                         this.$logger('update data', { res, err })
@@ -262,20 +263,57 @@ export default {
 
                     let _sql = `select a1 from related_user where a2='${item.user_number}' or a3='${item.user_number}' or a4='${item.user_number}' or a5='${item.user_number}' or a6='${item.user_number}'`
                     this.$db.get(_sql, (err, res) => {
-                        this.$logger('related_user', { err, res })
+                        this.$logger('related_user44444444', { err, res })
                         if (res) {
                             let _sql = `update accept set js_count=${item.count},user_number='${item.user_number}' where action_no = '${res.a1}'`
                             this.$db.run(_sql, (err, res) => {
                                 this.$logger('update related_user', { err, res })
                             })
+                        } else if (!err) {
+                            // 没有找到受理清单
+                            this.onNotFoundUserMember({ user_number: item.user_number })
                         }
                     })
                 }
             }
-            this.uploadloading = false
+
+            // 更新没有找到受理清单的数据
+            this.handleUpdateNotFoundUserMember()
+
             // 更新完以后重新获取分析信息
-            //
-            this.onFetchPackageDatas()
+            setTimeout(() => {
+                this.uploadloading = false
+                this.onFetchPackageDatas()
+            }, 600)
+        },
+        handleUpdateNotFoundUserMember() {
+            // 1.查询出所有没有找到的
+            let sql = `select user_number from bill where not_found_user=1`
+            this.$db.all(sql, (err, res) => {
+                if (!err && res) {
+                    res.forEach(e => {
+                        this.$logger('res.forEach', e)
+                        let v = e.user_number
+                        let sql = `select a.action_no from accept a left join related_user r on r.a1=a.action_no where a.action_no='${v}' or a2='${v}' or a3='${v}' or a4='${v}' or a5='${v}' or a6='${v}'`
+                        this.$db.get(sql, (err, res) => {
+                            if (res && res.action_no) {
+                                // 删除node_found_user
+                                let upBill = `update bill set not_found_user = 0 where user_number = '${v}' `
+                                this.$db.run(upBill, (err, res) => {
+                                    this.$logger('onNotFoundUserMember', { err, res })
+                                })
+                                // 更新accept副卡信息
+                                if (res.action_no != v) {
+                                    let upAcc = `update accept set user_number='${v}' where action_no='${res.action_no}'`
+                                    this.$db.run(upBill, (err, res) => {
+                                        this.$logger('onNotFoundUserMember update accept', { err, res })
+                                    })
+                                }
+                            }
+                        })
+                    })
+                }
+            })
         },
         onRouterList() {
             this.$router.push('/bill/list')
@@ -314,7 +352,8 @@ export default {
                 this.monthInsertErrorCount = res.count
             })
             // 获取没有找到对于业务号码的结算数据
-            this.$db.get(`${month_sql} and not_found_user=1`, (err, res = []) => {
+            this.$db.get(`select count(*) as count from bill where not_found_user=1`, (err, res = []) => {
+                console.log('notfound', { err, res })
                 this.notFoundUserCount = res.count
             })
         },
@@ -567,7 +606,7 @@ export default {
 
                 const sql = `select * from bill where not_found_user = 1`
                 datas = await new Promise(resolve => {
-                    this.$db.run(sql, (err, res) => {
+                    this.$db.all(sql, (err, res) => {
                         this.$logger('onNotFoundUserMember', { err, res })
                         resolve(res || [])
                     })
@@ -644,7 +683,7 @@ export default {
             // 文件发生变化
             this.$logger('onChange', e)
         },
-        submitUpload() {
+        async submitUpload() {
             let fileList = this.$electron.remote.dialog.showOpenDialog({
                 properties: ['openFile', 'multiSelections'],
                 filters: { name: 'xlsx', extensions: ['xlsx', 'xls'] }
@@ -661,9 +700,13 @@ export default {
 
             this.tableNum = fileList
 
-            fileList.forEach((e, i) => {
-                this.onOpenFile(e, i)
-            })
+            for (var i = 0; i < fileList.length; i++) {
+                await this.onOpenFile(fileList[i], i)
+            }
+            // fileList.forEach((e, i) => {
+            //     this.onOpenFile(e, i)
+            // })
+            this.loading = false
 
             // this.onOpenFile(input.files)
         },
@@ -678,7 +721,7 @@ export default {
                 this.$logger({ json })
             }
         },
-        onOpenFile(path, i) {
+        async onOpenFile(path, i) {
             // 获取数据
             const excelBuffer = fs.readFileSync(path)
 
@@ -693,6 +736,7 @@ export default {
 
             // 分析数据
             const _data = []
+            const fun = []
             result.SheetNames.forEach(key => {
                 let json = xlsx.utils.sheet_to_json(result.Sheets[key])
 
@@ -713,7 +757,7 @@ export default {
                             obj[k] = e[v]
                         }
                     }
-                    this.onInsertDatas(obj, now)
+                    fun.push(this.onInsertDatas(obj, now))
                     return obj
                 })
 
@@ -728,6 +772,9 @@ export default {
                 }
                 // this.$logger({ json })
             })
+
+            var promiseData = await Promise.all(fun)
+            this.$logger('Promise', promiseData)
 
             // 分析未找到数据
             this.datas = _data
@@ -751,57 +798,59 @@ export default {
             // 筛选数据
             this.handleParseLose()
             // })
-            this.loading = false
             // download.excel('xxx.xlxs', result2)
         },
         onInsertDatas(datas, now) {
-            datas.created = now
-            let keys = Object.keys(datas).join(',')
-            let values = Object.values(datas).join(`','`)
-            // 插入数据库
-            const sql = `insert into bill (${keys}) values ('${values}')`
-            // this.$logger(sql)
-            this.$db.run(sql, err => {
-                if (err) {
-                    this.$logger(err)
-                    datas.error = err.toString()
-                    this.insertError.push(datas)
-                } else {
-                    this.insertSuccessCount++
+            return new Promise(resolve => {
+                datas.created = now
+                let keys = Object.keys(datas).join(',')
+                let values = Object.values(datas).join(`','`)
+                // 插入数据库
+                const sql = `insert into bill (${keys}) values ('${values}')`
+                // this.$logger(sql)
+                this.$db.run(sql, err => {
+                    if (err) {
+                        this.$logger(err)
+                        datas.error = err.toString()
+                        this.insertError.push(datas)
+                    } else {
+                        this.insertSuccessCount++
 
-                    // 更新acceptjs_count
-                    const id = datas.user_number
-                    const sql = `update accept set js_count=js_count+1 where action_no='${id}' or user_number='${id}'`
-                    this.$db.run(sql, err => {
-                        if (err) {
-                            this.$logger(id, '更新js_count失败')
-                            // 判断数据是否在副卡中
-                            const sql2 = `select a1 from related_user where a2='${id}' or a3='${id}' or a4='${id}' or a5='${id}' or a6='${id}'`
-                            this.$db.get(sql2, (err, res) => {
-                                this.$logger(id, '查找副卡', res, err)
+                        // 更新acceptjs_count
+                        const id = datas.user_number
+                        const sql = `update accept set js_count=js_count+1 where action_no='${id}' or user_number='${id}'`
+                        this.$db.run(sql, err => {
+                            if (err) {
+                                this.$logger(id, '更新js_count失败')
+                                // 判断数据是否在副卡中
+                                const sql2 = `select a1 from related_user where a2='${id}' or a3='${id}' or a4='${id}' or a5='${id}' or a6='${id}'`
+                                this.$db.get(sql2, (err, res) => {
+                                    this.$logger(id, '查找副卡', res, err)
 
-                                if (err) {
-                                    // 不在副卡中就标记为未找到受理用户
-                                    this.onNotFoundUserMember(datas)
-                                } else {
-                                    // 找到就更新结算条数, js_count
-                                    const sql = `update accept set js_count=js_count+1, user_number='${id}' where action_no='${res.a1}'`
-                                    this.$logger('添加绑定副卡', res, sql)
-                                    this.$db.run(sql, err => {
-                                        // this.$logger(err)
-                                        if (err) {
-                                            this.onNotFoundUserMember(datas)
-                                        }
-                                    })
-                                }
-                            })
-                        }
-                    })
-                }
+                                    if (err) {
+                                        // 不在副卡中就标记为未找到受理用户
+                                        this.onNotFoundUserMember(datas)
+                                    } else {
+                                        // 找到就更新结算条数, js_count
+                                        const sql = `update accept set js_count=js_count+1, user_number='${id}' where action_no='${res.a1}'`
+                                        this.$logger('添加绑定副卡', res, sql)
+                                        this.$db.run(sql, err => {
+                                            // this.$logger(err)
+                                            if (err) {
+                                                this.onNotFoundUserMember(datas)
+                                            }
+                                        })
+                                    }
+                                })
+                            }
+                        })
+                    }
+                    resolve(err)
+                })
             })
         },
         onNotFoundUserMember(datas) {
-            this.notFoundUserMember.push(datas)
+            // this.notFoundUserMember.push(datas)
             const sql = `update bill set not_found_user = 1 where user_number = '${datas.user_number}' `
             this.$db.run(sql, (err, res) => {
                 this.$logger('onNotFoundUserMember', { err, res })

@@ -14,7 +14,7 @@
                 <span slot="title">套餐管理</span>
             </el-menu-item>
             <el-menu-item index="4" :route="{ name: 'relate' }">
-                <i class="el-icon-s-cooperation"></i>
+                <i class="el-icon-connection"></i>
                 <span slot="title">关联副卡</span>
             </el-menu-item>
         </el-menu>

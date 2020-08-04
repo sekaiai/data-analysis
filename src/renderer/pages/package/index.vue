@@ -59,9 +59,10 @@
                     <div class="taocao-tip">
                         <p>每次结算时间用半角逗号分隔。每个逗号代表每次结算的间隔。</p>
                         <p style="line-height: 1.4;">
-                            例：某套餐次月开结算，之后每月都结算共结算3次。 填写1,1,1。这里填写一个1就行了。
+                            例：某套餐次月(3月)开结算，共结算3次,结算月为(4,5,6)。
+                            填写(1,1,1)。也可以只填(1)，后面不填则默认为1。
                         </p>
-                        <p>例：某套餐次月开始结算，每次结算+1月，共结算3次。 1,2,2</p>
+                        <p>例：某套餐本月(3月)开始结算，每次结算+1月(3, 5, 7)，共结算3次。 填写(0,2,2)</p>
                     </div>
                     <el-input v-model="ruleForm['law']"></el-input>
                 </el-form-item>
@@ -82,7 +83,7 @@ export default {
     data() {
         var validatePass = (rule, value, callback) => {
             if (!/^(\d|,)+$/.test(value)) {
-                callback(new Error('请输入数字和半角逗号（,）'))
+                callback(new Error('只能输入数字和半角逗号，不能包含括号'))
             } else {
                 callback()
             }
