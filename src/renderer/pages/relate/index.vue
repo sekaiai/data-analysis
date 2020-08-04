@@ -5,9 +5,20 @@
     :element-loading-text="`正在导入数据。写入成功${countSuccess}, 写入失败${countError}`"
   >
     <div class="title-line">关联副卡</div>
+
     <div class="flex">
-      <!-- <el-button @click="handleSearch" type="primary">添加副卡</el-button> -->
-      <el-button @click="submitUpload" type="default">导入副卡数据</el-button>
+      <div class="flex-item">
+        <el-input @keyup.enter.native="onFetchData" v-model="user_number" placeholder="号码查询, 可输入部分" />
+      </div>
+
+      <div class="flex-item">
+        <el-button @click="onFetchData" type="primary">查询</el-button>
+      </div>
+
+      <div class="flex-item">
+        <!-- <el-button @click="handleSearch" type="primary">添加副卡</el-button> -->
+        <el-button @click="submitUpload" type="default">导入副卡数据</el-button>
+      </div>
     </div>
 
     <div class="table-box flex1" ref="tableBox">
@@ -37,6 +48,7 @@ export default {
   data() {
     return {
       loading: false,
+      user_number: '', //
       datas: [],
       page: 0,
       total: 0,
@@ -57,6 +69,7 @@ export default {
     this.onInit()
   },
   methods: {
+    onSearch() {},
     onInit() {
       this.page = 1
       this.onFetchData()
@@ -67,8 +80,16 @@ export default {
       this.onFetchData()
     },
     onFetchData() {
+      console.log('keyup')
       let star = (this.page - 1) * this.limit
-      const sql = `select * from related_user limit ${star},${this.limit}`
+      let limit = ` limit ${star},${this.limit}`
+      let sql = `select * from related_user`
+
+      const id = this.user_number
+      if (id) {
+        sql += ` where a1 like '%${id}%' or a2 like '%${id}%' or a3 like '%${id}%' or a4 like '%${id}%' or a5 like '%${id}%' or a6 like '%${id}%' group by a1`
+      }
+      sql += limit
 
       this.$db.all(sql, (err, res = []) => {
         this.$logger(err, res)
