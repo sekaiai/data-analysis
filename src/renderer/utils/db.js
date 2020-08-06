@@ -116,6 +116,7 @@ db.serialize(() => {
      * cause: 原因
      * not_found_user: 没有找到业务ID
      * branch: 网点
+     * branch_id: 网点ID
      */
     // db.run(`drop table bill`, err => {
     //     console.log(err)
@@ -137,7 +138,8 @@ not_found_user INTEGER DEFAULT 0,
 status INTEGER,
 cause varchar(200),
 branch varchar(200),
-created varchar(200)
+created varchar(200),
+branch_id varchar(100)
     )`,
         err => {
             logger(err)
@@ -152,6 +154,9 @@ created varchar(200)
     //     console.log(err)
     // })
 
+    db.run(`CREATE INDEX branch_id ON bill (branch_id)`, err => {
+        console.log(err)
+    })
     db.run(`CREATE INDEX order_id ON bill (order_id)`, err => {
         console.log(err)
     })

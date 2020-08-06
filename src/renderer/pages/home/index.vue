@@ -18,10 +18,10 @@
 
             <el-dialog title="获取远程数据" :visible.sync="fetchBoxVisible" width="500px">
                 <div class="flex">
-                    <div class="flex-item">
+                    <!--  <div class="flex-item">
                         <div class="title">工号</div>
                         <el-input v-model="member_id" placeholder="请输入工号" />
-                    </div>
+                    </div> -->
                     <div class="flex-item">
                         <div class="title">账期</div>
                         <el-date-picker v-model="fetchMonth" type="month" placeholder="选择月"> </el-date-picker>
@@ -29,7 +29,7 @@
                 </div>
                 <div class="flex" style="margin-top: 20px;">
                     <!-- <el-button @click="onParallelLimit(3)">获取数据</el-button> -->
-                    <el-button @click="handleRequestDatasHelp">获取数据</el-button>
+                    <el-button @click="fetchWangdian">获取数据</el-button>
                 </div>
             </el-dialog>
         </div>
@@ -45,7 +45,40 @@
         <div class="title-line">导入结算表分析</div>
 
         <div class="logs" v-if="fetchLogs">
-            <p v-for="(v, k) in fetchLogs" :key="k">{{ v }}</p>
+            <div class="flex">
+                <el-button type="primary" @click="visibleErrorLogs = true">查看采集失败记录</el-button>
+                <p v-if="lostLogs.length">
+                    有{{ lostLogs.length }}页数据采集失败，<el-button
+                        type="primary"
+                        @click="fetchWangdianDatasHelp(lostLogs)"
+                        >重新采集失败数据</el-button
+                    >
+                </p>
+            </div>
+
+            <div>
+                <el-button type="primary" @click="visibleSuccessLogs = true">查看采集成功记录</el-button>
+            </div>
+
+            <el-dialog title="采集成功记录" :visible.sync="visibleSuccessLogs" max-height="550">
+                <el-table :data="log">
+                    <el-table-column property="k" label="网点" width="100"></el-table-column>
+                    <el-table-column property="eLen" label="未结算" width="200"></el-table-column>
+                    <el-table-column property="sLen" label="已结算"></el-table-column>
+                </el-table>
+            </el-dialog>
+            <el-dialog title="采集失败记录" :visible.sync="visibleErrorLogs" max-height="550">
+                <el-table :data="lostLogs">
+                    <el-table-column property="member_id" label="网点" width="100"></el-table-column>
+                    <el-table-column property="type" label="未结算" width="200">
+                        <template slot-scope="scope">
+                            {{ scope.row.type === 'broadBandUNSettledBillDetail' ? '未结算' : '已结算' }}
+                        </template>
+                    </el-table-column>
+                    <el-table-column property="page" label="页数"></el-table-column>
+                </el-table>
+            </el-dialog>
+
             <p>采集到数据：{{ fetchDatas.length }}条</p>
 
             <template v-if="fetchDatas.length > 0">
@@ -184,8 +217,11 @@ export default {
     name: 'bill',
     data() {
         return {
+            lostLogs: [],
+            wangdian: [], //所有网点
             fetchLoading: false, //是否采集中
             fetchLogs: [], //采集日志数据
+            fetchLogs2: {}, //采集日志数据
             fetchDatas: [], //采集的数据
             fetchMonth: '', //账期
             branch_title: '', //网点名称
@@ -306,18 +342,178 @@ export default {
             this.isLogin = true
         }
         this.onFetchPackageDatas()
+
+        let data = JSON.parse(localStorage.getItem('localdata'))
+        if (data) {
+            this.fetchDatas = data
+        }
     },
     methods: {
+        // 先获取所有网点
+        fetchWangdian() {
+            if (!this.fetchMonth) {
+                return this.$message({
+                    message: '请选择周期',
+                    type: 'error'
+                })
+            }
+            let url = `http://service.gz.189.cn/wtcommission/index.php/api/index/broadBandUNSettledBillDetail/default.shtml`
+            this.fetchLoading = true
+            this.fetchBoxVisible = false
+            var cookiejar = rp.jar()
+            cookiejar.setCookie(this.cookies, 'http://service.gz.189.cn')
+
+            const options = {
+                url,
+                jar: cookiejar,
+                method: 'GET',
+                headers: {
+                    'accept-language': 'zh,zh-CN;q=0.9,en;q=0.8'
+                }
+            }
+            rp(options)
+                .then(async res => {
+                    // console.log(res)
+                    var $ = cheerio.load(res)
+                    let title = $('title').text()
+                    if (title === '登陆' || title === '登录') {
+                        this.isLogin = false
+                        this.loginVisible = true
+                        this.fetchBoxVisible = false
+                        setTimeout(() => {
+                            this.$message({
+                                message: '登录信息过期了，请重新登录',
+                                type: 'error'
+                            })
+                        }, 300)
+                        this.fetchLoading = false
+                    } else {
+                        this.wangdian = Array.from($('#AgentPointCode option'))
+                            .map(e => $(e).val())
+                            .slice(1)
+                        console.log('fetchWangdianDatas', ['W15410'] || this.wangdian)
+                        this.fetchWangdianDatas(this.wangdian)
+                        // 写入数据库
+                        // this.onInsertFetchDatas(vals)
+
+                        // 1. 先获取页数。
+                        // 2. 循环获取数据，记录获取成功和失败。
+                    }
+                })
+                .catch(err => {
+                    this.$notify.error({
+                        title: '获取数据失败',
+                        message: err.error
+                    })
+                })
+        },
+        fetchWangdianDatas(lists) {
+            // 1. 获取所有网点
+            let fetchMonth = dayjs(this.fetchMonth).format('YYYYMM')
+            let arr = []
+
+            lists.forEach(e => {
+                let obj = { page: 1, fetchMonth, member_id: e }
+                arr.push({ ...obj, type: 'broadBandSettledBillDetail' })
+                arr.push({ ...obj, type: 'broadBandUNSettledBillDetail' })
+            })
+            console.log(arr)
+
+            this.fetchWangdianDatasHelp(arr)
+        },
+        fetchWangdianDatasHelp(arr) {
+            this.fetchLoading = true
+            let limit = 5
+
+            async.mapLimit(arr, limit, this.handleRequestDatas, (err, result) => {
+                // result.forEach(e => arr.push(...e))
+                console.log(err, result)
+                // localStorage.setItem('localdata', JSON.stringify(this.fetchDatas))
+
+                // 解析出失败的数据。
+                // let arr2 = []
+                // 没有获取到数据的
+                let arr = []
+                let noDataPage = []
+
+                for (let k in x) {
+                    let v = x[k]
+
+                    // broadBandSettledBillDetail: 已结算
+                    // broadBandUNSettledBillDetail: 未结算
+                    let sLen = 0
+                    let eLen = 0
+
+                    for (let k2 in v) {
+                        let { date, id, page } = v[k2]
+                        let flag = k2 === '成功'
+
+                        page.forEach(e => {
+                            if (flag) {
+                                sLen += e.len | 0
+                            } else {
+                                eLen += e.len | 0
+                            }
+                            if (e.page !== 1) {
+                                // 没有获取到数据。
+                                if (e.len === 0 || e.error) {
+                                    noDataPage.push({
+                                        page: e.page,
+                                        fetchMonth: date,
+                                        member_id: id,
+                                        type: flag ? 'broadBandSettledBillDetail' : 'broadBandUNSettledBillDetail'
+                                    })
+                                }
+                            }
+                        })
+                    }
+
+                    arr.push({ k, sLen, eLen })
+                }
+                this.fetchLogs.push(...arr)
+                this.lostLogs = noDataPage
+                this.fetchLoading = false
+
+                // resolve(arr)
+            })
+        },
         donwloadFetchDatas() {
             // 下载采集数据到本地。
+
+            // datas = this.parseAoaData(datas, json)
+            var tit = [
+                '总金额',
+                '订单号',
+                '用户号码',
+                '套餐',
+                '佣金账期',
+                '结算金额',
+                '佣金政策',
+                '受理日期',
+                '竣工日期',
+                '发展人',
+                '发展人编码',
+                '一级',
+                '二级',
+                '三级'
+            ]
+            const datas = [tit, ...this.fetchDatas]
+
+            // 下载
+            const name = `[导出信息]`
+            const book_name = 'book_name'
+            this.$logger(datas)
+
+            this.onDownload(datas, name)
         },
         onInsertFetchDatas(datas) {
             const now = dayjs().unix()
+            console.log('datas.length', datas.length)
             datas.forEach(e => {
                 // 受理日期： e[7]
 
                 datas = {
-                    date: e[10], //'账期',
+                    date: e[4], //'账期',
                     order_id: e[1], //'订单号',
                     complete_date: e[8], //'订单竣工时间',
                     commission_policy: `${e[11]}-${e[12]}-${e[13]}`, //'佣金结算策略',
@@ -342,14 +538,18 @@ export default {
         },
         async handleRequestDatasHelp() {
             this.fetchLoading = true
-            await this.handleRequestDatas({ page: 1, type: 'broadBandSettledBillDetail' })
-            await this.handleRequestDatas({ page: 1, type: 'broadBandUNSettledBillDetail' })
+
+            let params = { page: 1, fetchMonth: dayjs(this.fetchMonth).format('YYYYMM'), member_id: this.member_id }
+            await this.handleRequestDatas({ ...params, type: 'broadBandSettledBillDetail' })
+            await this.handleRequestDatas({ ...params, type: 'broadBandUNSettledBillDetail' })
+            this.fetchLoading = false
         },
         // broadBandSettledBillDetail: 已结算
         // broadBandUNSettledBillDetail: 未结算
-        handleRequestDatas({ page, type }, callback) {
+        handleRequestDatas({ page, type, fetchMonth, member_id }, callback) {
             // layui-laypage-last
-            if (!this.member_id || !this.fetchMonth) {
+            if (!member_id || !fetchMonth) {
+                console.log({ page, type, fetchMonth, member_id })
                 return this.$message({
                     message: '请填写账期和工号',
                     type: 'error'
@@ -357,10 +557,10 @@ export default {
             }
             const type_text = type == 'broadBandSettledBillDetail' ? '已结算' : '未结算'
 
-            const fetchMonth = dayjs(this.fetchMonth).format('YYYYMM')
+            // const fetchMonth = dayjs(this.fetchMonth).format('YYYYMM')
 
-            const url = `http://service.gz.189.cn/wtcommission/index.php/api/index/${type}/AgentPointCode/${this.member_id}/BillingCycleID/${fetchMonth}/PageNBR/${page}`
-
+            const url = `http://service.gz.189.cn/wtcommission/index.php/api/index/${type}/AgentPointCode/${member_id}/BillingCycleID/${fetchMonth}/PageNBR/${page}`
+            console.log(url)
             // 未结算数据
             // const url2 = `http://service.gz.189.cn/wtcommission/index.php/api/index/broadBandUNSettledBillDetail/AgentPointCode/WS5240/BillingCycleID/202006/PageNBR/1`
 
@@ -375,22 +575,23 @@ export default {
                     'accept-language': 'zh,zh-CN;q=0.9,en;q=0.8'
                 }
             }
+
             if (page === 1) {
-                this.fetchLogs.push(`开始采集工号${this.member_id}账期${fetchMonth}的数据`)
+                this.fetchLogs = `${type_text}：开始采集工号${member_id}账期${fetchMonth}的数据`
                 this.fetchBoxVisible = false
 
                 this.$notify({
                     title: '提示',
-                    message: `开始采集${type_text}数据`,
+                    message: `开始采集${type_text}网点${member_id}数据`,
                     type: 'warning'
                 })
             }
-            console.log(`${type_text}: 开始采集第${page}页数据`)
-            this.fetchLogs.push(`${type_text}: 开始采集第${page}页数据`)
+            console.log(`${type_text}:${member_id}: 开始采集第${page}页数据`)
+            this.fetchLogs = `${type_text}:${member_id}: 开始采集第${page}页数据`
 
             rp(options)
                 .then(async res => {
-                    console.log(res)
+                    // console.log(res)
                     var $ = cheerio.load(res)
                     let title = $('title').text()
                     if (title === '登陆' || title === '登录') {
@@ -409,13 +610,32 @@ export default {
                                 return Array.from($(tr).find('.car-text')).map(e => $(e).text())
                             })
                             .slice(2)
+                        console.log({ vals })
 
-                        this.fetchLogs.push(`${type_text}: 第${page}页获取到${vals.length}条数据`)
+                        let log = `${type_text}:${member_id}: 第${page}页获取到${vals.length}条数据`
+                        if (!vals[0] || vals[0].length < 3) {
+                            log = `${type_text}:${member_id}: 没有数据`
+                            vals = []
+                        }
+                        // 写入数据库
+                        this.onInsertFetchDatas(vals)
+
+                        // this.fetchLogs = log
 
                         if (page === 1) {
                             // 获取总页数
                             let last_page = $('.layui-laypage-last').attr('data-page')
-                            this.fetchLogs.push(`${type_text}: 共有${last_page}页数据`)
+                            // this.fetchLogs = `${type_text}:${member_id}: 共有${last_page || page}页数据`
+                            if (!this.fetchLogs2[member_id]) {
+                                this.fetchLogs2[member_id] = {}
+                            }
+                            this.fetchLogs2[member_id][type_text] = {
+                                id: member_id,
+                                date: fetchMonth,
+                                last_page: last_page,
+                                page: [{ page, len: vals.length }]
+                            }
+
                             // 获取网点名称
                             this.branch_title = $('.card-query > div')
                                 .eq(2)
@@ -425,20 +645,52 @@ export default {
                             // return vals
                             this.fetchDatas.push(...vals)
                             if (last_page > 1) {
-                                let data = await this.onParallelLimit(last_page, type)
+                                let data = await this.onParallelLimit(last_page, { fetchMonth, member_id, type })
                                 this.fetchDatas.push(...data)
                             }
+                            callback(null, true)
                         } else {
+                            try {
+                                // console.log('111111111111', this.fetchLogs2[member_id], type_text, page)
+                                // console.log('00000', this.fetchLogs2[member_id][type_text], page)
+
+                                this.fetchLogs2[member_id][type_text].page.push({ page, len: vals.length })
+                            } catch (err) {
+                                console.log('error', err)
+                            }
+
                             callback(null, vals)
                         }
-                        // 写入数据库
-                        this.onInsertFetchDatas(vals)
 
                         // 1. 先获取页数。
                         // 2. 循环获取数据，记录获取成功和失败。
                     }
                 })
                 .catch(err => {
+                    if (page === 1) {
+                        callback(null, { member_id, page, type: false })
+                    } else {
+                        callback(null, [])
+                    }
+                    console.log('2222222222222', err)
+
+                    if (!this.fetchLogs2[member_id]) {
+                        this.fetchLogs2[member_id] = {}
+                    }
+                    try {
+                        if (page === 1) {
+                            this.fetchLogs2[member_id][type_text] = {
+                                id: member_id,
+                                date: fetchMonth,
+                                page: [{ page, error: err.error }]
+                            }
+                        } else {
+                            this.fetchLogs2[member_id][type_text].page.push({ page, error: err.error })
+                        }
+                    } catch (err) {
+                        console.log('error', err)
+                    }
+
                     this.$notify.error({
                         title: '获取数据失败',
                         message: err.error
@@ -446,12 +698,12 @@ export default {
                 })
         },
 
-        onParallelLimit(page, type) {
+        onParallelLimit(page, params) {
             return new Promise(resolve => {
                 let limit = 5
                 let pages = Array(page - 1)
                     .fill()
-                    .map((e, i) => ({ page: i + 2, type }))
+                    .map((e, i) => ({ page: i + 2, ...params }))
 
                 async.mapLimit(pages, limit, this.handleRequestDatas, (err, result) => {
                     let arr = []
@@ -492,7 +744,7 @@ export default {
                             this.fetchCodeing = false
                             clearTimeout(this.fetchCodeTimeout)
                         }
-                    })
+                    }, 1000)
                     this.$message({
                         message: res.msg,
                         type: res.code === 1 ? 'success' : 'error'
@@ -884,7 +1136,6 @@ export default {
                             // 筛选出已存在的
                             __count = __count.filter(e => !qd.includes(e * 1))
 
-                            // this.$logger('找出结算成功的数据', qd, __count)
                             accept_count_arr.push(
                                 ...__count.map(e2 => {
                                     e.date = e2
@@ -924,7 +1175,7 @@ export default {
 
             vals.forEach(e => {
                 // 竣工时间
-                let day = dayjs(e.date_end * 1000).format('YYYYMM')
+                let day = dayjs.unix(e.date_end).format('YYYYMM')
 
                 // 计算本月该数据该计算几次，暂时按照个月结算。月月结算
                 // let _count = now - day
@@ -1242,7 +1493,7 @@ export default {
                 // this.$logger(sql)
                 this.$db.run(sql, err => {
                     if (err) {
-                        this.$logger(err)
+                        this.$logger('插入数据错误', err)
                         datas.error = err.toString()
                         this.insertError.push(datas)
                     } else {
