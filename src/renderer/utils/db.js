@@ -50,13 +50,17 @@ db.serialize(() => {
       remark VARCHAR(255),
       js_count INTEGER DEFAULT 0 NOT NULL,
       import_date VARCHAR(255),
-      user_number VARCHAR(255),
-      UNIQUE(\`action_no\`)
+      user_number VARCHAR(255)
   )`,
         err => {
             logger(err)
         }
     )
+
+    db.run(`CREATE UNIQUE INDEX action_no ON accept (action_no)`, err => {
+        console.log(err)
+    })
+
     db.run(`CREATE INDEX user_number ON accept (user_number)`, err => {
         console.log(err)
     })
@@ -84,14 +88,17 @@ db.serialize(() => {
      name VARCHAR(255) NOT NULL,
      count VARCHAR(255) NOT NULL,
      law VARCHAR(255) NOT NULL,
-     law_desc VARCHAR(255),
-     UNIQUE(\`name\`)
+     law_desc VARCHAR(255)
      
     )`,
         err => {
             logger(err)
         }
     )
+
+    db.run(`CREATE UNIQUE INDEX name ON package (name)`, err => {
+        console.log(err)
+    })
 
     /**
      * 结算表
@@ -130,15 +137,27 @@ not_found_user INTEGER DEFAULT 0,
 status INTEGER,
 cause varchar(200),
 branch varchar(200),
-created varchar(200),
-     UNIQUE(\`order_id\`)
-
+created varchar(200)
     )`,
         err => {
             logger(err)
         }
     )
 
+    // db.run('DROP INDEX `order_id` ON `bill`', (err, res) => {
+    //     console.log({ err, res })
+    // })
+
+    // db.run(`CREATE UNIQUE INDEX order_id_status ON bill (order_id,status)`, err => {
+    //     console.log(err)
+    // })
+
+    db.run(`CREATE INDEX order_id ON bill (order_id)`, err => {
+        console.log(err)
+    })
+    db.run(`CREATE INDEX status ON bill (status)`, err => {
+        console.log(err)
+    })
     db.run(`create index date ON bill (date)`, err => {
         console.log(err)
     })
@@ -178,16 +197,14 @@ a2 varchar(200),
 a3 varchar(200),
 a4 varchar(200),
 a5 varchar(200),
-a6 varchar(200),
-     UNIQUE(\`a1\`)
-
+a6 varchar(200)
     )`,
         err => {
             logger(err)
         }
     )
 
-    db.run(`create index a1 ON related_user (a1)`, err => {
+    db.run(`create UNIQUE index a1 ON related_user (a1)`, err => {
         console.log(err)
     })
     db.run(`create index a ON related_user (a2,a3,a4,a5,a6)`, err => {

@@ -20,7 +20,7 @@
         </el-menu>
         <!-- <el-scrollbar class='main'> -->
         <div class="continer flex1 flex">
-            <keep-alive exclude="blist,bill">
+            <keep-alive exclude="blist">
                 <router-view class="main flex1 flex-column flex"></router-view>
             </keep-alive>
         </div>

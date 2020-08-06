@@ -1,12 +1,61 @@
 <template>
     <div id="home" v-loading.lock="loading" :element-loading-text="`正在解析数据`">
-        <div class="clear" @click="handleClearData">清空数据表</div>
+        <div class="fetch-datas-box">
+            <el-dialog title="登录" :visible.sync="loginVisible" width="380px">
+                <div class="flex">
+                    <el-input style="margin-right: 10px; flex:1" v-model="username" placeholder="请输入工号" />
+                    <el-button @click="handleRequestCode" :loading="fetchCodeing === true">{{
+                        fetchCodeing > 1 ? `已发送(${fetchCodeing})` : '获取验证码'
+                    }}</el-button>
+                </div>
+                <div class="flex" style="margin-top: 16px; margin-bottom: 20px;">
+                    <el-input v-model="vercode" placeholder="请输验证码" />
+                </div>
+                <div class="flex">
+                    <el-button type="primary" @click="handleRequestLogin">登录</el-button>
+                </div>
+            </el-dialog>
+
+            <el-dialog title="获取远程数据" :visible.sync="fetchBoxVisible" width="500px">
+                <div class="flex">
+                    <div class="flex-item">
+                        <div class="title">工号</div>
+                        <el-input v-model="member_id" placeholder="请输入工号" />
+                    </div>
+                    <div class="flex-item">
+                        <div class="title">账期</div>
+                        <el-date-picker v-model="fetchMonth" type="month" placeholder="选择月"> </el-date-picker>
+                    </div>
+                </div>
+                <div class="flex" style="margin-top: 20px;">
+                    <!-- <el-button @click="onParallelLimit(3)">获取数据</el-button> -->
+                    <el-button @click="handleRequestDatasHelp">获取数据</el-button>
+                </div>
+            </el-dialog>
+        </div>
 
         <div class="title-line">结算分析</div>
         <div class="form-line">
             <el-button type="primary" @click="submitUpload">导入结算清单</el-button>
+            <el-button v-if="!isLogin" @click="loginVisible = true">登录</el-button>
+            <el-button type="primary" :loading="fetchLoading" v-else="isLogin" @click="fetchBoxVisible = true">{{
+                fetchLoading ? '正在采集数据' : '获取远程数据'
+            }}</el-button>
         </div>
         <div class="title-line">导入结算表分析</div>
+
+        <div class="logs" v-if="fetchLogs">
+            <p v-for="(v, k) in fetchLogs" :key="k">{{ v }}</p>
+            <p>采集到数据：{{ fetchDatas.length }}条</p>
+
+            <template v-if="fetchDatas.length > 0">
+                <div>{{ fetchLoading ? '正在采集数据中，采集完成后' : '采集完毕' }}可下载</div>
+                <div v-if="!fetchLoading">
+                    <el-button type="primary" @click="donwloadFetchDatas">下载excel</el-button>
+                </div>
+            </template>
+        </div>
+
         <p>共导入{{ tableNum.length }}张表</p>
         <p>结算成功：{{ importSuccessCount }}</p>
         <p>结算数据：{{ importErrorCount }}</p>
@@ -24,6 +73,7 @@
             >
         </p>
         <div class="title-line">账期分析</div>
+
         <p>
             本月需要结算的清单数量<span>{{ accept_count }}</span>
             <el-button
@@ -112,6 +162,7 @@
                 重新统计{{ uploadloading ? '中...' : '数据' }}
             </el-button>
             <el-button type="default" @click="onRouterList">查看历史数据</el-button>
+            <el-button type="default" @click="handleClearData">删除所有数据(包括历史数据)</el-button>
         </div>
     </div>
 </template>
@@ -119,13 +170,35 @@
 import download from '@/utils/download.js'
 import dayjs from 'dayjs'
 import xlsx from 'xlsx'
+import async from 'async'
 const fs = require('fs')
 // const { readFileSync } = fs
+
+const request = require('request')
+const rp = require('request-promise')
+const tough = require('tough-cookie')
+var Cookie = tough.Cookie
+const cheerio = require('cheerio')
 
 export default {
     name: 'bill',
     data() {
         return {
+            fetchLoading: false, //是否采集中
+            fetchLogs: [], //采集日志数据
+            fetchDatas: [], //采集的数据
+            fetchMonth: '', //账期
+            branch_title: '', //网点名称
+            member_id: 'WS5240', //工号
+            username: 'D00094',
+            fetchBoxVisible: false, //获取数据框
+            vercode: '',
+            isLogin: false, //是否登录成功
+            cookies: [],
+            token: '', //登录用的token
+            loginVisible: false, //打开登录窗口
+            fetchCodeing: false, //获取验证码 状态和时间
+
             uploadloading: false, //重新统计的加载按钮
             monthInsertSuccessCount: 0, //当月插入成功数
             monthOutSuccess: 0, //本月导入结算成功的清单数量
@@ -216,10 +289,324 @@ export default {
                 .unix()
         }
     },
+    watch: {
+        loginVisible(v) {
+            if (v) {
+                this.handleRequestLoginInfo()
+            }
+        }
+    },
     created() {
+        let cookies = localStorage.getItem('cookies')
+        if (cookies) {
+            // this.cookies = new tough.Cookie(JSON.parse(cookies)[0])
+            // localStorage.setItem('cookies', this.cookies)
+
+            this.cookies = cookies
+            this.isLogin = true
+        }
         this.onFetchPackageDatas()
     },
     methods: {
+        donwloadFetchDatas() {
+            // 下载采集数据到本地。
+        },
+        onInsertFetchDatas(datas) {
+            const now = dayjs().unix()
+            datas.forEach(e => {
+                // 受理日期： e[7]
+
+                datas = {
+                    date: e[10], //'账期',
+                    order_id: e[1], //'订单号',
+                    complete_date: e[8], //'订单竣工时间',
+                    commission_policy: `${e[11]}-${e[12]}-${e[13]}`, //'佣金结算策略',
+                    commission_type: e[6], //'佣金结算类型',
+                    commission_money: e[5], //'佣金结算金额（元）',
+                    package_name: e[3], //'发展套餐名',
+                    // product_name: '产品类型',
+                    // user_id: '用户ID',
+                    user_number: e[2], // '用户号码',
+                    status: 1, //'是否成功结算',
+                    // cause: '原因',
+                    branch: this.branch_title
+                }
+
+                // let keys = Object.keys(datas).join(',')
+                // let values = Object.values(datas).join(`','`)
+                // // 插入数据库
+                // const sql = `insert into bill (${keys}) values ('${values}')`
+
+                this.onInsertDatas(datas, now)
+            })
+        },
+        async handleRequestDatasHelp() {
+            this.fetchLoading = true
+            await this.handleRequestDatas({ page: 1, type: 'broadBandSettledBillDetail' })
+            await this.handleRequestDatas({ page: 1, type: 'broadBandUNSettledBillDetail' })
+        },
+        // broadBandSettledBillDetail: 已结算
+        // broadBandUNSettledBillDetail: 未结算
+        handleRequestDatas({ page, type }, callback) {
+            // layui-laypage-last
+            if (!this.member_id || !this.fetchMonth) {
+                return this.$message({
+                    message: '请填写账期和工号',
+                    type: 'error'
+                })
+            }
+            const type_text = type == 'broadBandSettledBillDetail' ? '已结算' : '未结算'
+
+            const fetchMonth = dayjs(this.fetchMonth).format('YYYYMM')
+
+            const url = `http://service.gz.189.cn/wtcommission/index.php/api/index/${type}/AgentPointCode/${this.member_id}/BillingCycleID/${fetchMonth}/PageNBR/${page}`
+
+            // 未结算数据
+            // const url2 = `http://service.gz.189.cn/wtcommission/index.php/api/index/broadBandUNSettledBillDetail/AgentPointCode/WS5240/BillingCycleID/202006/PageNBR/1`
+
+            var cookiejar = rp.jar()
+            cookiejar.setCookie(this.cookies, 'http://service.gz.189.cn')
+
+            const options = {
+                jar: cookiejar,
+                method: 'GET',
+                url,
+                headers: {
+                    'accept-language': 'zh,zh-CN;q=0.9,en;q=0.8'
+                }
+            }
+            if (page === 1) {
+                this.fetchLogs.push(`开始采集工号${this.member_id}账期${fetchMonth}的数据`)
+                this.fetchBoxVisible = false
+
+                this.$notify({
+                    title: '提示',
+                    message: `开始采集${type_text}数据`,
+                    type: 'warning'
+                })
+            }
+            console.log(`${type_text}: 开始采集第${page}页数据`)
+            this.fetchLogs.push(`${type_text}: 开始采集第${page}页数据`)
+
+            rp(options)
+                .then(async res => {
+                    console.log(res)
+                    var $ = cheerio.load(res)
+                    let title = $('title').text()
+                    if (title === '登陆' || title === '登录') {
+                        this.isLogin = false
+                        this.loginVisible = true
+                        this.fetchBoxVisible = false
+                        setTimeout(() => {
+                            this.$message({
+                                message: '登录信息过期了，请重新登录',
+                                type: 'error'
+                            })
+                        }, 300)
+                    } else {
+                        var vals = Array.from($('table.cartable').find('tr'))
+                            .map(tr => {
+                                return Array.from($(tr).find('.car-text')).map(e => $(e).text())
+                            })
+                            .slice(2)
+
+                        this.fetchLogs.push(`${type_text}: 第${page}页获取到${vals.length}条数据`)
+
+                        if (page === 1) {
+                            // 获取总页数
+                            let last_page = $('.layui-laypage-last').attr('data-page')
+                            this.fetchLogs.push(`${type_text}: 共有${last_page}页数据`)
+                            // 获取网点名称
+                            this.branch_title = $('.card-query > div')
+                                .eq(2)
+                                .find('.layui-input-inline')
+                                .text()
+
+                            // return vals
+                            this.fetchDatas.push(...vals)
+                            if (last_page > 1) {
+                                let data = await this.onParallelLimit(last_page, type)
+                                this.fetchDatas.push(...data)
+                            }
+                        } else {
+                            callback(null, vals)
+                        }
+                        // 写入数据库
+                        this.onInsertFetchDatas(vals)
+
+                        // 1. 先获取页数。
+                        // 2. 循环获取数据，记录获取成功和失败。
+                    }
+                })
+                .catch(err => {
+                    this.$notify.error({
+                        title: '获取数据失败',
+                        message: err.error
+                    })
+                })
+        },
+
+        onParallelLimit(page, type) {
+            return new Promise(resolve => {
+                let limit = 5
+                let pages = Array(page - 1)
+                    .fill()
+                    .map((e, i) => ({ page: i + 2, type }))
+
+                async.mapLimit(pages, limit, this.handleRequestDatas, (err, result) => {
+                    let arr = []
+                    result.forEach(e => arr.push(...e))
+                    console.log(err, result)
+                    resolve(arr)
+                })
+            })
+        },
+        // 获取验证码
+        handleRequestCode() {
+            var cookiejar = rp.jar()
+            cookiejar.setCookie(this.cookies, 'http://service.gz.189.cn')
+
+            if (this.fetchCodeing) return
+            this.fetchCodeing = true
+
+            const url = 'http://service.gz.189.cn/wtcommission/index.php/api/popedom/sendMes/default.shtml'
+            const options = {
+                jar: cookiejar,
+                method: 'POST',
+                url,
+                headers: {
+                    'accept-language': 'zh,zh-CN;q=0.9,en;q=0.8'
+                },
+                json: true,
+                form: {
+                    username: this.username
+                }
+                // proxy: process.env.NODE_ENV === 'development' && 'http://127.0.0.1:1087'
+            }
+            rp(options)
+                .then(res => {
+                    this.fetchCodeing = 120
+                    this.fetchCodeTimeout = setTimeout(() => {
+                        this.fetchCodeing--
+                        if (this.fetchCodeing < 1) {
+                            this.fetchCodeing = false
+                            clearTimeout(this.fetchCodeTimeout)
+                        }
+                    })
+                    this.$message({
+                        message: res.msg,
+                        type: res.code === 1 ? 'success' : 'error'
+                    })
+                })
+                .catch(err => {
+                    this.$message({
+                        message: err.msg || err.message || '189.cn拒绝访问',
+                        type: 'error'
+                    })
+                })
+        },
+        // 获取登录信息，PHPSESSID
+        handleRequestLoginInfo() {
+            const url = 'http://service.gz.189.cn/wtcommission/index.php/api/popedom/login/default.shtml'
+            const options = {
+                method: 'GET',
+                url,
+                headers: {
+                    'accept-language': 'zh,zh-CN;q=0.9,en;q=0.8'
+                },
+                transform: function(body, res) {
+                    let cookies
+                    if (res.headers['set-cookie'] instanceof Array)
+                        cookies = res.headers['set-cookie'].map(Cookie.parse)
+                    else cookies = [Cookie.parse(res.headers['set-cookie'])]
+
+                    cookies = cookies.filter(e => e.key === 'PHPSESSID')[0]
+                    // let cookie = res.headers['set-cookie'].map(Cookie.parse)
+                    return { body, cookies }
+                }
+
+                // proxy: process.env.NODE_ENV === 'development' && 'http://127.0.0.1:1087'
+            }
+            rp(options)
+                .then(({ body, cookies }) => {
+                    let $ = cheerio.load(body)
+                    this.token = $('#input_token').val()
+                    this.cookies = new tough.Cookie(cookies).toString()
+                })
+                .catch(err => {
+                    console.log(err)
+                })
+        },
+        // 登录
+        handleRequestLogin() {
+            if (!this.username || !this.vercode) {
+                return this.$message({
+                    message: '请填写用户名和验证码',
+                    type: 'error'
+                })
+            }
+            console.log({
+                userName: this.username,
+                password: '',
+                token: this.token,
+                username: this.username,
+                VerCode: this.vercode
+            })
+            var cookiejar = rp.jar()
+            cookiejar.setCookie(this.cookies, 'http://service.gz.189.cn')
+
+            const url = 'http://service.gz.189.cn/wtcommission/index.php/api/popedom/isLogin/default.shtml'
+            const options = {
+                jar: cookiejar,
+                method: 'POST',
+                url,
+                headers: {
+                    'accept-language': 'zh,zh-CN;q=0.9,en;q=0.8'
+                },
+                form: {
+                    userName: this.username,
+                    password: '',
+                    token: this.token,
+                    username: this.username,
+                    VerCode: this.vercode
+                }
+            }
+            rp(options)
+                .then(body => {
+                    console.log(body)
+                    if (body) {
+                        let $ = cheerio.load(body)
+                        let title = $('h1').text()
+                        let message = $('h2').text()
+                        console.log(title, message)
+                        if (title === '错误提示') {
+                            this.$message({
+                                message: `${title}: ${message}`,
+                                type: 'error'
+                            })
+                            this.fetchCodeTimeout = 1
+                            // 重新获取token和cookie
+                            this.handleRequestLoginInfo()
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.log(err)
+                    console.log(err.statusCode)
+                    if (err.statusCode === 302) {
+                        this.$message({
+                            message: '登录成功',
+                            type: 'success'
+                        })
+                        this.fetchBoxVisible = true
+                        // 登录成功了
+                        this.isLogin = true
+                        this.loginVisible = false
+                        // 把cookie从本地。免得刷新
+                        localStorage.setItem('cookies', this.cookies)
+                    }
+                })
+        },
         router2bill(type) {
             const query = {
                 created: new Date().toString()
@@ -334,11 +721,18 @@ export default {
             this.$router.push('/bill/list')
         },
         handleClearData() {
-            // 清空数据库
-            this.$db.run(`delete from bill where id > 0`, (err, res) => {
-                this.$logger({ err, res })
+            this.$confirm(`这个会删除本地所有已保存的清单列表。`, '提示', {
+                confirmButtonText: '删除',
+                cancelButtonText: '不删除',
+                type: 'info '
+            }).then(() => {
+                // 清空数据库
+                this.$db.run(`delete from bill where id > 0`, (err, res) => {
+                    this.$logger({ err, res })
+                })
             })
         },
+
         // 获取本月待计算受理数
         onFetchPackageDatas() {
             this.accept_count = 0
