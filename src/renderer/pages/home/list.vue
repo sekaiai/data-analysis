@@ -71,6 +71,15 @@
                 size="mini"
                 >导出查询结果</el-button
             >
+            <el-button
+                v-if="total > 0"
+                style="margin-left: 10px;"
+                type="success"
+                :loading="outputLoading"
+                @click="handleDeleteDatas"
+                size="mini"
+                >删除查询的数据(删了就没了)</el-button
+            >
         </div>
 
         <div class="table-box flex1" ref="tableBox">
@@ -182,6 +191,31 @@ export default {
         this.onFetchDatasCount()
     },
     methods: {
+        handleDeleteDatas() {
+            // 删除山鹑的结果
+            this.$confirm('该操作会删除所选条件下的所有数据且不可恢复!', '提示', {
+                confirmButtonText: '确定',
+                cancelButtonText: '取消',
+                type: 'warning'
+            })
+                .then(() => {
+                    let where = this.onParseSearchSQL()
+                    let sql = `delete from bill where  ${where}`
+
+                    this.$db.run(sql, (err, res) => {
+                        console.log(err, res)
+                        if (!err) {
+                            this.$message({
+                                message: '数据已删除',
+                                type: 'success'
+                            })
+                        }
+                    })
+                })
+                .catch(err => {
+                    console.log(err)
+                })
+        },
         handleOutputDatas() {
             this.outputLoading = true
             let where = this.onParseSearchSQL()
@@ -327,6 +361,8 @@ export default {
             let limit = `limit ${start}, 20`
             let where = this.onParseSearchSQL()
             const sql = `select b.* from bill b where ${where} ${limit}`
+            // const sql = `select b.*,a.acceptor,a.user,a.action_no as acno from bill b left join accept a on (a.user_number=b.user_number or a.action_no=b.user_number) where  ${where} ${limit}`
+
             this.$db.all(sql, (err, res = []) => {
                 this.$logger({ res, sql })
                 this.datas = res

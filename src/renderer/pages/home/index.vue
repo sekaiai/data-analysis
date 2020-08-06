@@ -46,22 +46,20 @@
 
         <div class="logs" v-if="fetchLogs">
             <div class="flex">
-                <el-button type="primary" @click="visibleErrorLogs = true">查看采集失败记录</el-button>
-                <p v-if="lostLogs.length">
-                    有{{ lostLogs.length }}页数据采集失败，<el-button
-                        type="primary"
-                        @click="fetchWangdianDatasHelp(lostLogs)"
-                        >重新采集失败数据</el-button
-                    >
-                </p>
+                <el-button type="default" @click="visibleErrorLogs = true">查看采集失败记录</el-button>
+
+                <el-button type="default" @click="visibleSuccessLogs = true">查看采集成功记录</el-button>
             </div>
 
             <div>
-                <el-button type="primary" @click="visibleSuccessLogs = true">查看采集成功记录</el-button>
+                <p v-if="true || lostLogs.length">
+                    <b>有{{ lostLogs.length }}页数据采集失败，</b
+                    ><el-button type="text" @click="fetchWangdianDatasHelp(lostLogs)">重新采集失败数据</el-button>
+                </p>
             </div>
 
             <el-dialog title="采集成功记录" :visible.sync="visibleSuccessLogs" max-height="550">
-                <el-table :data="log">
+                <el-table :data="fetchLogs">
                     <el-table-column property="k" label="网点" width="100"></el-table-column>
                     <el-table-column property="eLen" label="未结算" width="200"></el-table-column>
                     <el-table-column property="sLen" label="已结算"></el-table-column>
@@ -217,6 +215,8 @@ export default {
     name: 'bill',
     data() {
         return {
+            visibleSuccessLogs: false,
+            visibleErrorLogs: false,
             lostLogs: [],
             wangdian: [], //所有网点
             fetchLoading: false, //是否采集中
@@ -391,7 +391,6 @@ export default {
                         this.wangdian = Array.from($('#AgentPointCode option'))
                             .map(e => $(e).val())
                             .slice(1)
-                        console.log('fetchWangdianDatas', ['W15410'] || this.wangdian)
                         this.fetchWangdianDatas(this.wangdian)
                         // 写入数据库
                         // this.onInsertFetchDatas(vals)
@@ -423,6 +422,7 @@ export default {
         },
         fetchWangdianDatasHelp(arr) {
             this.fetchLoading = true
+            this.fetchLogs2 = {}
             let limit = 5
 
             async.mapLimit(arr, limit, this.handleRequestDatas, (err, result) => {
@@ -436,7 +436,7 @@ export default {
                 let arr = []
                 let noDataPage = []
 
-                for (let k in x) {
+                for (let k in result) {
                     let v = x[k]
 
                     // broadBandSettledBillDetail: 已结算
@@ -644,11 +644,12 @@ export default {
 
                             // return vals
                             this.fetchDatas.push(...vals)
+                            let data = []
                             if (last_page > 1) {
-                                let data = await this.onParallelLimit(last_page, { fetchMonth, member_id, type })
+                                data = await this.onParallelLimit(last_page, { fetchMonth, member_id, type })
                                 this.fetchDatas.push(...data)
                             }
-                            callback(null, true)
+                            callback(null, [...vals, ...data])
                         } else {
                             try {
                                 // console.log('111111111111', this.fetchLogs2[member_id], type_text, page)
