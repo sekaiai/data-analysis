@@ -45,8 +45,8 @@
         <div class="title-line">导入结算表分析</div>
 
         <div class="logs">
-            <div class="flex" v-if="!fetchLoading">
-                <template v-if="fetchDatas.length > 0 && !ee.length">
+            <div class="flex">
+                <template v-if="!fetchLoading && fetchDatas.length > 0 && !ee.length">
                     <el-button type="danger" size="small" @click="onInsertFetchDatas">保存到数据库</el-button>
                     <el-button type="primary" size="small" @click="donwloadFetchDatas">下载excel</el-button>
                 </template>
@@ -479,7 +479,7 @@ export default {
 
             // datas = this.parseAoaData(datas, json)
             var tit = [
-                '总金额',
+                '是否结算',
                 '订单号',
                 '用户号码',
                 '套餐',
@@ -492,7 +492,9 @@ export default {
                 '发展人编码',
                 '一级',
                 '二级',
-                '三级'
+                '三级',
+                '网点名称',
+                '网点编号'
             ]
             const datas = [tit, ...this.fetchDatas]
 
@@ -521,9 +523,9 @@ export default {
                     // product_name: '产品类型',
                     // user_id: '用户ID',
                     user_number: e[2], // '用户号码',
-                    status: 1, //'是否成功结算',
+                    status: e[0], //'是否成功结算',
                     // cause: '原因',
-                    branch: this.branch_title
+                    branch: e[14]
                 }
 
                 // let keys = Object.keys(datas).join(',')
@@ -554,7 +556,8 @@ export default {
                     type: 'error'
                 })
             }
-            const type_text = type == 'broadBandSettledBillDetail' ? '已结算' : '未结算'
+            const type_status = (type === 'broadBandSettledBillDetail') * 1
+            const type_text = type_status ? '已结算' : '未结算'
 
             // const fetchMonth = dayjs(this.fetchMonth).format('YYYYMM')
 
@@ -604,9 +607,19 @@ export default {
                             })
                         }, 300)
                     } else {
+                        // 获取网点名称
+                        let branch_title = $('.card-query > div')
+                            .eq(2)
+                            .find('.layui-input-inline')
+                            .text()
+
                         var vals = Array.from($('table.cartable').find('tr'))
                             .map(tr => {
-                                return Array.from($(tr).find('.car-text')).map(e => $(e).text())
+                                let data = Array.from($(tr).find('.car-text')).map(e => $(e).text())
+                                let js = (type === 'broadBandSettledBillDetail') * 1
+                                data.splice(0, 1, type_status)
+                                data.push(branch_title, member_id)
+                                return data
                             })
                             .slice(2)
                         console.log({ vals })
@@ -641,12 +654,6 @@ export default {
                                 last_page: last_page,
                                 page: [{ page, len: vals.length }]
                             }*/
-
-                            // 获取网点名称
-                            this.branch_title = $('.card-query > div')
-                                .eq(2)
-                                .find('.layui-input-inline')
-                                .text()
 
                             // return vals
                             let data = []
