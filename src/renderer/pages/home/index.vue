@@ -1,7 +1,7 @@
 <template>
     <div id="home" v-loading.lock="loading" :element-loading-text="`正在解析数据`">
         <div class="fetch-datas-box">
-            <el-dialog title="登录" :visible.sync="loginVisible" width="380px">
+            <el-dialog :close-on-click-modal="false" title="登录" :visible.sync="loginVisible" width="380px">
                 <div class="flex">
                     <el-input style="margin-right: 10px; flex:1" v-model="username" placeholder="请输入工号" />
                     <el-button @click="handleRequestCode" :loading="fetchCodeing === true">{{
@@ -193,7 +193,7 @@
                 重新统计{{ uploadloading ? '中...' : '数据' }}
             </el-button>
             <el-button type="default" @click="onRouterList">查看历史数据</el-button>
-            <el-button type="default" @click="handleClearData">删除所有数据(包括历史数据)</el-button>
+            <!-- <el-button type="default" @click="handleClearData">删除所有数据(包括历史数据)</el-button> -->
         </div>
     </div>
 </template>

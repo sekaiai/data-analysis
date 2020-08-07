@@ -16,8 +16,8 @@
                 添加规则
             </el-button>
         </div>
-        <div class="table-box flex1" ref="tableBox">
-            <el-table :data="datas" :height="tableHeight" v-if="tableHeight">
+        <div class="table-box flex1">
+            <el-table :data="datas" height="60vh">
                 <el-table-column prop="name" label="发展套餐名称"> </el-table-column>
                 <el-table-column prop="__count" label="本月待结算受理数"></el-table-column>
                 <el-table-column prop="__nums" label="本月待受理清单"></el-table-column>
@@ -37,6 +37,7 @@
                 </el-table-column>
             </el-table>
         </div>
+
         <el-dialog
             title="提示"
             :visible.sync="dialogVisible"
@@ -366,6 +367,8 @@ export default {
     flex-wrap: wrap;
     margin-left: -5px;
     margin-right: -5px;
+    overflow: auto;
+    height: calc(40vh - 156px);
 
     .el-tag {
         margin: 5px;
