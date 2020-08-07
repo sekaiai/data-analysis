@@ -1,6 +1,6 @@
 {
   "name": "data-analysis",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "author": "313867808@qq.com",
   "description": "Easy invoicing system stand-alone desktop version,An electron-vue sqlite3 project",
   "license": "MIT",
@@ -78,6 +78,7 @@
     ]
   },
   "dependencies": {
+    "cheerio": "^1.0.0-rc.3",
     "request": "^2.88.2",
     "request-promise": "^4.2.6",
     "sqlite3": "^4.0.1"

@@ -44,31 +44,36 @@
         </div>
         <div class="title-line">导入结算表分析</div>
 
-        <div class="logs" v-if="fetchLogs">
-            <div class="flex">
-                <el-button type="default" @click="visibleErrorLogs = true">查看采集失败记录</el-button>
+        <div class="logs">
+            <div class="flex" v-if="!fetchLoading">
+                <template v-if="fetchDatas.length > 0 && !ee.length">
+                    <el-button type="danger" size="small" @click="onInsertFetchDatas">保存到数据库</el-button>
+                    <el-button type="primary" size="small" @click="donwloadFetchDatas">下载excel</el-button>
+                </template>
 
-                <el-button type="default" @click="visibleSuccessLogs = true">查看采集成功记录</el-button>
+                <el-button type="default" size="small" @click="visibleErrorLogs = true">查看采集失败记录</el-button>
+
+                <el-button type="default" size="small" @click="visibleSuccessLogs = true">查看采集成功记录</el-button>
             </div>
 
             <div>
-                <p v-if="true || lostLogs.length">
-                    <b>有{{ lostLogs.length }}页数据采集失败，</b
-                    ><el-button type="text" @click="fetchWangdianDatasHelp(lostLogs)">重新采集失败数据</el-button>
+                <p v-if="ee.length">
+                    <b>有{{ ee.length }}页数据采集失败</b>
+                    <el-button type="text" @click="fetchWangdianDatasHelp(ee)">采集失败数据</el-button>
                 </p>
             </div>
 
             <el-dialog title="采集成功记录" :visible.sync="visibleSuccessLogs" max-height="550">
-                <el-table :data="fetchLogs">
+                <el-table :data="ss2">
                     <el-table-column property="k" label="网点" width="100"></el-table-column>
-                    <el-table-column property="eLen" label="未结算" width="200"></el-table-column>
-                    <el-table-column property="sLen" label="已结算"></el-table-column>
+                    <el-table-column property="未结算" label="未结算" width="200"></el-table-column>
+                    <el-table-column property="已结算" label="已结算"></el-table-column>
                 </el-table>
             </el-dialog>
             <el-dialog title="采集失败记录" :visible.sync="visibleErrorLogs" max-height="550">
-                <el-table :data="lostLogs">
+                <el-table :data="ee">
                     <el-table-column property="member_id" label="网点" width="100"></el-table-column>
-                    <el-table-column property="type" label="未结算" width="200">
+                    <el-table-column property="type" label="类型" width="200">
                         <template slot-scope="scope">
                             {{ scope.row.type === 'broadBandUNSettledBillDetail' ? '未结算' : '已结算' }}
                         </template>
@@ -78,13 +83,6 @@
             </el-dialog>
 
             <p>采集到数据：{{ fetchDatas.length }}条</p>
-
-            <template v-if="fetchDatas.length > 0">
-                <div>{{ fetchLoading ? '正在采集数据中，采集完成后' : '采集完毕' }}可下载</div>
-                <div v-if="!fetchLoading">
-                    <el-button type="primary" @click="donwloadFetchDatas">下载excel</el-button>
-                </div>
-            </template>
         </div>
 
         <p>共导入{{ tableNum.length }}张表</p>
@@ -173,21 +171,7 @@
                 >(导出)</el-button
             >条
         </p>
-        <!-- <p>
-    未结算清单数量<span>{{accept_count}}</span>条<el-button v-if='!loading' type="text" size='mini' @click='handleAnalysisDownload(`success`)'>导出</el-button>
-</p> -->
-        <!--         <p>
-            实际结算<span>{{success.length}}</span>条<el-button v-if='!loading' type="text" size='mini' @click='handleAnalysisDownload(`error`)'>导出</el-button>。
-        </p> -->
-        <!--         <p>
-            未结算清单<span>{{accept_count - }}</span>条<el-button
-                v-if="!loading"
-                type="text"
-                size="mini"
-                @click="handleAnalysisDownload(`lose`)"
-                >导出</el-button
-            >
-        </p> -->
+
         <div>
             <el-button type="success" @click="handleUpdate" :loading="uploadloading">
                 重新统计{{ uploadloading ? '中...' : '数据' }}
@@ -215,6 +199,9 @@ export default {
     name: 'bill',
     data() {
         return {
+            ss: {},
+            ss2: [],
+            ee: [],
             visibleSuccessLogs: false,
             visibleErrorLogs: false,
             lostLogs: [],
@@ -422,21 +409,22 @@ export default {
         },
         fetchWangdianDatasHelp(arr) {
             this.fetchLoading = true
-            this.fetchLogs2 = {}
+            this.ee = []
             let limit = 5
+            console.log('fetchWangdianDatasHelp', arr)
 
             async.mapLimit(arr, limit, this.handleRequestDatas, (err, result) => {
                 // result.forEach(e => arr.push(...e))
                 console.log(err, result)
                 // localStorage.setItem('localdata', JSON.stringify(this.fetchDatas))
-
+                /*
                 // 解析出失败的数据。
                 // let arr2 = []
                 // 没有获取到数据的
                 let arr = []
                 let noDataPage = []
 
-                for (let k in result) {
+                for (let k in this.fetchLogs2) {
                     let v = x[k]
 
                     // broadBandSettledBillDetail: 已结算
@@ -471,11 +459,20 @@ export default {
                     arr.push({ k, sLen, eLen })
                 }
                 this.fetchLogs.push(...arr)
-                this.lostLogs = noDataPage
+                this.lostLogs = noDataPage*/
                 this.fetchLoading = false
+                this.formatSS2()
 
                 // resolve(arr)
             })
+        },
+        formatSS2() {
+            let arr = []
+            for (let x in this.ss) {
+                let v = this.ss[x]
+                arr.push({ k: x, ...v })
+            }
+            this.ss2 = arr
         },
         donwloadFetchDatas() {
             // 下载采集数据到本地。
@@ -506,13 +503,14 @@ export default {
 
             this.onDownload(datas, name)
         },
-        onInsertFetchDatas(datas) {
+        onInsertFetchDatas() {
+            let datas = this.fetchDatas
             const now = dayjs().unix()
             console.log('datas.length', datas.length)
             datas.forEach(e => {
                 // 受理日期： e[7]
 
-                datas = {
+                let _datas = {
                     date: e[4], //'账期',
                     order_id: e[1], //'订单号',
                     complete_date: e[8], //'订单竣工时间',
@@ -533,7 +531,7 @@ export default {
                 // // 插入数据库
                 // const sql = `insert into bill (${keys}) values ('${values}')`
 
-                this.onInsertDatas(datas, now)
+                this.onInsertDatas(_datas, now)
             })
         },
         async handleRequestDatasHelp() {
@@ -546,7 +544,8 @@ export default {
         },
         // broadBandSettledBillDetail: 已结算
         // broadBandUNSettledBillDetail: 未结算
-        handleRequestDatas({ page, type, fetchMonth, member_id }, callback) {
+        handleRequestDatas(params, callback) {
+            let { page, type, fetchMonth, member_id } = params
             // layui-laypage-last
             if (!member_id || !fetchMonth) {
                 console.log({ page, type, fetchMonth, member_id })
@@ -577,7 +576,7 @@ export default {
             }
 
             if (page === 1) {
-                this.fetchLogs = `${type_text}：开始采集工号${member_id}账期${fetchMonth}的数据`
+                // this.fetchLogs = `${type_text}：开始采集工号${member_id}账期${fetchMonth}的数据`
                 this.fetchBoxVisible = false
 
                 this.$notify({
@@ -587,7 +586,7 @@ export default {
                 })
             }
             console.log(`${type_text}:${member_id}: 开始采集第${page}页数据`)
-            this.fetchLogs = `${type_text}:${member_id}: 开始采集第${page}页数据`
+            // this.fetchLogs = `${type_text}:${member_id}: 开始采集第${page}页数据`
 
             rp(options)
                 .then(async res => {
@@ -618,23 +617,30 @@ export default {
                             vals = []
                         }
                         // 写入数据库
-                        this.onInsertFetchDatas(vals)
+                        // this.onInsertFetchDatas(vals)
 
+                        this.fetchDatas.push(...vals)
                         // this.fetchLogs = log
 
                         if (page === 1) {
                             // 获取总页数
                             let last_page = $('.layui-laypage-last').attr('data-page')
                             // this.fetchLogs = `${type_text}:${member_id}: 共有${last_page || page}页数据`
-                            if (!this.fetchLogs2[member_id]) {
+                            /*if (!this.fetchLogs2[member_id]) {
                                 this.fetchLogs2[member_id] = {}
+                            }*/
+                            if (!this.ee[member_id]) {
+                                this.ss[member_id] = {}
                             }
-                            this.fetchLogs2[member_id][type_text] = {
+
+                            this.ss[member_id][type_text] = vals.length
+
+                            /*this.fetchLogs2[member_id][type_text] = {
                                 id: member_id,
                                 date: fetchMonth,
                                 last_page: last_page,
                                 page: [{ page, len: vals.length }]
-                            }
+                            }*/
 
                             // 获取网点名称
                             this.branch_title = $('.card-query > div')
@@ -643,19 +649,29 @@ export default {
                                 .text()
 
                             // return vals
-                            this.fetchDatas.push(...vals)
                             let data = []
                             if (last_page > 1) {
+                                if (vals.length === 0) {
+                                    this.ee.push(params)
+                                }
                                 data = await this.onParallelLimit(last_page, { fetchMonth, member_id, type })
-                                this.fetchDatas.push(...data)
+                                // this.fetchDatas.push(...data)
                             }
                             callback(null, [...vals, ...data])
                         } else {
                             try {
                                 // console.log('111111111111', this.fetchLogs2[member_id], type_text, page)
                                 // console.log('00000', this.fetchLogs2[member_id][type_text], page)
+                                if (!this.ss[member_id]) {
+                                    this.ss[member_id] = {}
+                                }
+                                this.ss[member_id][type_text] = (this.ss[member_id][type_text] | 0) + vals.length
 
-                                this.fetchLogs2[member_id][type_text].page.push({ page, len: vals.length })
+                                if (vals.length === 0) {
+                                    this.ee.push(params)
+                                }
+
+                                // this.fetchLogs2[member_id][type_text].page.push({ page, len: vals.length })
                             } catch (err) {
                                 console.log('error', err)
                             }
@@ -668,6 +684,8 @@ export default {
                     }
                 })
                 .catch(err => {
+                    this.ee.push(params)
+
                     if (page === 1) {
                         callback(null, { member_id, page, type: false })
                     } else {
@@ -675,10 +693,10 @@ export default {
                     }
                     console.log('2222222222222', err)
 
-                    if (!this.fetchLogs2[member_id]) {
+                    /*if (!this.fetchLogs2[member_id]) {
                         this.fetchLogs2[member_id] = {}
-                    }
-                    try {
+                    }*/
+                    /*try {
                         if (page === 1) {
                             this.fetchLogs2[member_id][type_text] = {
                                 id: member_id,
@@ -690,7 +708,7 @@ export default {
                         }
                     } catch (err) {
                         console.log('error', err)
-                    }
+                    }*/
 
                     this.$notify.error({
                         title: '获取数据失败',

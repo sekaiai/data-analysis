@@ -112,7 +112,7 @@
                             </el-form>
                         </template>
                     </el-table-column>
-                    <el-table-column v-for="(v, i) in columns" :prop="i" :label="v"> </el-table-column>
+                    <el-table-column v-for="(v, i) in columns" :key="i" :prop="i" :label="v"> </el-table-column>
                     <!-- <el-table-column prop="no" label="购物车流水号"> </el-table-column> -->
                 </el-table>
             </template>
