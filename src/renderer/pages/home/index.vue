@@ -582,11 +582,11 @@ export default {
                 // this.fetchLogs = `${type_text}：开始采集工号${member_id}账期${fetchMonth}的数据`
                 this.fetchBoxVisible = false
 
-                this.$notify({
+                /*this.$notify({
                     title: '提示',
                     message: `开始采集${type_text}网点${member_id}数据`,
                     type: 'warning'
-                })
+                })*/
             }
             console.log(`${type_text}:${member_id}: 开始采集第${page}页数据`)
             // this.fetchLogs = `${type_text}:${member_id}: 开始采集第${page}页数据`
@@ -594,8 +594,13 @@ export default {
             rp(options)
                 .then(async res => {
                     // console.log(res)
+
                     var $ = cheerio.load(res)
                     let title = $('title').text()
+
+                    console.log(`${type_text}:${member_id}: 开始采集第${page}页数据 - ${title}`)
+                    // console.log(res)
+
                     if (title === '登陆' || title === '登录') {
                         this.isLogin = false
                         this.loginVisible = true
@@ -622,13 +627,13 @@ export default {
                                 return data
                             })
                             .slice(2)
-                        console.log({ vals })
 
                         let log = `${type_text}:${member_id}: 第${page}页获取到${vals.length}条数据`
-                        if (!vals[0] || vals[0].length < 3) {
+                        if (!vals[0] || vals[0].length < 8) {
                             log = `${type_text}:${member_id}: 没有数据`
                             vals = []
                         }
+                        console.log(log)
                         // 写入数据库
                         // this.onInsertFetchDatas(vals)
 
@@ -667,8 +672,6 @@ export default {
                             callback(null, [...vals, ...data])
                         } else {
                             try {
-                                // console.log('111111111111', this.fetchLogs2[member_id], type_text, page)
-                                // console.log('00000', this.fetchLogs2[member_id][type_text], page)
                                 if (!this.ss[member_id]) {
                                     this.ss[member_id] = {}
                                 }
@@ -726,7 +729,7 @@ export default {
 
         onParallelLimit(page, params) {
             return new Promise(resolve => {
-                let limit = 5
+                let limit = 1
                 let pages = Array(page - 1)
                     .fill()
                     .map((e, i) => ({ page: i + 2, ...params }))
