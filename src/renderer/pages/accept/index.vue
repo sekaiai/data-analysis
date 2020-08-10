@@ -275,7 +275,6 @@ export default {
         parseDate(v) {
             return dayjs(v * 1000).format('YYYY-MM-DD hh:ss:mm')
             // let date = new Date(v * 1)
-            // this.$logger(v, date)
             // return `${date.getFullYear()}年${date.getMonth() +
             //     1}月${date.getDay()}日 ${date.getHours()}时${date.getMinutes()}分${date.getSeconds()}秒`
         }
@@ -302,7 +301,6 @@ export default {
             }
         },
         onFetchAddrs() {
-            this.$logger('hhhh')
             if (!this.addrs.length) this.onFetchQudao()
         },
         onFetchProductMain() {
@@ -323,7 +321,6 @@ export default {
             )
                 .then(() => {
                     let where = this.onParseSearchSQL()
-                    this.$logger({ where })
                     if (!where) {
                         where = 'where true'
                     }
@@ -335,7 +332,6 @@ export default {
 
                     const sql = `delete from accept ${where}`
                     this.$db.run(sql, (err, res) => {
-                        this.$logger(err, res)
                         this.deleteLoading = false
                         this.$message({
                             type: err ? 'error' : 'success',
@@ -354,13 +350,10 @@ export default {
             if (this[`${key}s`].length) {
                 return
             }
-            this.$logger({ key })
             const sql = `select ${key} as val from accept group by ${key}`
             this.$db.all(sql, (err, res) => {
                 if (err) {
-                    this.$logger(err)
                 } else {
-                    this.$logger(res)
                     // this.dataListTotalCount = res.totalCount;
                     const data = res.map(e => e.val).filter(e => e)
                     this.$set(this, `${key}s`, data)
@@ -368,7 +361,6 @@ export default {
             })
         },
         handleCurrentChange(page) {
-            this.$logger(page)
             const where = this.onParseSearchSQL(page)
             this.onFetchDatas(where)
         },
@@ -399,7 +391,6 @@ export default {
                 let b = dayjs(date)
                     .endOf('month')
                     .unix()
-                this.$logger(a, b)
                 where.push(`created between ${a} and ${b}`)
             }
             if (this.date_end) {
@@ -415,7 +406,6 @@ export default {
             }
             // const a = false && this.created && this.created.getTime()
             // const b = false && this.date_end && this.date_end.getTime()
-            // this.$logger(this.created)
             // if (a && b) {
             //     where.push(`created between ${a} and ${b}`)
             // } else if (a) {
@@ -437,7 +427,6 @@ export default {
                 where.push(`action_no like '%${this.action_no}%' or user_number like '%${this.action_no}%'`)
             }
 
-            this.$logger({ where })
             if (where.length > 0) {
                 where = where.join(' and ')
                 where = `where ${where}`
@@ -448,7 +437,6 @@ export default {
         },
         handleSearch(isClear) {
             let where = ''
-            this.$logger({ isClear })
             if (isClear == 'clear') {
                 this.user = ''
                 this.addr = ''
@@ -472,19 +460,29 @@ export default {
             this.onFetchDatas(where, 0)
                 .then(res => {
                     const datas = this.parseAoaData()
-                    const name = `${where}`
-                    const book_name = 'book_name'
-                    this.$logger(datas)
+                    const data = [{ datas, name: `查询结果`, book_name: '查询结果' }]
 
-                    download.excel2(datas, name, book_name).then(res => {
-                        this.outputLoading = false
+                    download
+                        .excel2(data)
+                        .then(res => {
+                            this.outputLoading = false
 
-                        this.$message({
-                            showClose: true,
-                            message: `数据表格创建${!res ? '成功' : '失败'}`,
-                            type: !res ? 'success' : 'error'
+                            this.$message({
+                                showClose: true,
+                                message: `数据表格创建${!res ? '成功' : '失败'}`,
+                                type: !res ? 'success' : 'error'
+                            })
                         })
-                    })
+                        .catch(err => {
+                            console.log('error', err)
+                            this.outputLoading = false
+
+                            this.$message({
+                                showClose: true,
+                                message: err.message,
+                                type: 'error'
+                            })
+                        })
                 })
                 .catch(err => {
                     this.outputLoading = false
@@ -493,12 +491,10 @@ export default {
         parseAoaData() {
             const line1 = Object.values(this.items)
             const keys = Object.keys(this.items)
-            this.$logger(line1, keys)
             const datas = this.datas.map(v => {
                 return keys.map(k => v[k])
             })
             datas.unshift(line1)
-            this.$logger(datas)
             return datas
         },
 
@@ -507,9 +503,7 @@ export default {
             const sql = `select addr from accept group by addr`
             this.$db.all(sql, (err, res) => {
                 if (err) {
-                    this.$logger(err)
                 } else {
-                    this.$logger(res)
                     // this.dataListTotalCount = res.totalCount;
                     this.addrs = res.map(e => e.addr)
                 }
@@ -524,18 +518,14 @@ export default {
             })
         },
         onFetchDatas(whereSQL = '', limit = 20) {
-            this.$logger({ page: this.page })
             limit = limit ? `limit ${this.limit * (this.page - 1)}, ${this.limit}` : ''
             const sql = `select * from accept ${whereSQL} ${limit}`
 
-            this.$logger(sql)
             return new Promise((resolve, reject) => {
                 this.$db.all(sql, (err, res) => {
                     if (err) {
-                        this.$logger(err)
                         reject(err)
                     } else {
-                        this.$logger(res)
                         // this.dataListTotalCount = res.totalCount;
                         this.datas = res
                         resolve(res)

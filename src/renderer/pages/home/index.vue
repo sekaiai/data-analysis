@@ -360,7 +360,7 @@ export default {
             }
             rp(options)
                 .then(async res => {
-                    // console.log(res)
+                    // this.$logger(res)
                     var $ = cheerio.load(res)
                     let title = $('title').text()
                     if (title === '登陆' || title === '登录') {
@@ -391,6 +391,7 @@ export default {
                         title: '获取数据失败',
                         message: err.error
                     })
+                    this.fetchLoading = false
                 })
         },
         fetchWangdianDatas(lists) {
@@ -403,67 +404,18 @@ export default {
                 arr.push({ ...obj, type: 'broadBandSettledBillDetail' })
                 arr.push({ ...obj, type: 'broadBandUNSettledBillDetail' })
             })
-            console.log(arr)
+            this.$logger(arr)
 
             this.fetchWangdianDatasHelp(arr)
         },
         fetchWangdianDatasHelp(arr) {
             this.fetchLoading = true
             this.ee = []
-            let limit = 5
-            console.log('fetchWangdianDatasHelp', arr)
+            let limit = 4
 
             async.mapLimit(arr, limit, this.handleRequestDatas, (err, result) => {
-                // result.forEach(e => arr.push(...e))
-                console.log(err, result)
-                // localStorage.setItem('localdata', JSON.stringify(this.fetchDatas))
-                /*
-                // 解析出失败的数据。
-                // let arr2 = []
-                // 没有获取到数据的
-                let arr = []
-                let noDataPage = []
-
-                for (let k in this.fetchLogs2) {
-                    let v = x[k]
-
-                    // broadBandSettledBillDetail: 已结算
-                    // broadBandUNSettledBillDetail: 未结算
-                    let sLen = 0
-                    let eLen = 0
-
-                    for (let k2 in v) {
-                        let { date, id, page } = v[k2]
-                        let flag = k2 === '成功'
-
-                        page.forEach(e => {
-                            if (flag) {
-                                sLen += e.len | 0
-                            } else {
-                                eLen += e.len | 0
-                            }
-                            if (e.page !== 1) {
-                                // 没有获取到数据。
-                                if (e.len === 0 || e.error) {
-                                    noDataPage.push({
-                                        page: e.page,
-                                        fetchMonth: date,
-                                        member_id: id,
-                                        type: flag ? 'broadBandSettledBillDetail' : 'broadBandUNSettledBillDetail'
-                                    })
-                                }
-                            }
-                        })
-                    }
-
-                    arr.push({ k, sLen, eLen })
-                }
-                this.fetchLogs.push(...arr)
-                this.lostLogs = noDataPage*/
                 this.fetchLoading = false
                 this.formatSS2()
-
-                // resolve(arr)
             })
         },
         formatSS2() {
@@ -496,19 +448,45 @@ export default {
                 '网点名称',
                 '网点编号'
             ]
-            const datas = [tit, ...this.fetchDatas]
+            // const datas = [tit, ...this.fetchDatas]
 
             // 下载
-            const name = `[导出信息]`
-            const book_name = 'book_name'
-            this.$logger(datas)
+            let date = ''
+            try {
+                date = this.fetchDatas[0][4]
+            } catch (err) {
+                date = '-'
+            }
+            const name = `采集${date}受理清单`
 
-            this.onDownload(datas, name)
+            // 分离出已结算和未结算
+
+            const success_list = []
+            const error_list = []
+            // 分离出成功和失败
+            this.fetchDatas.forEach((e, i) => {
+                if (i === 0) {
+                    error_list.push(tit)
+                    success_list.push(tit)
+                }
+
+                if (e[0]) {
+                    success_list.push(e)
+                } else {
+                    error_list.push(e)
+                }
+            })
+            const params = [
+                { datas: success_list, bookName: '已结算' },
+                { datas: error_list, bookName: '未结算' }
+            ]
+
+            this.onDownload(params, name)
         },
         onInsertFetchDatas() {
             let datas = this.fetchDatas
             const now = dayjs().unix()
-            console.log('datas.length', datas.length)
+            this.$logger('datas.length', datas.length)
             datas.forEach(e => {
                 // 受理日期： e[7]
 
@@ -550,7 +528,7 @@ export default {
             let { page, type, fetchMonth, member_id } = params
             // layui-laypage-last
             if (!member_id || !fetchMonth) {
-                console.log({ page, type, fetchMonth, member_id })
+                this.$logger({ page, type, fetchMonth, member_id })
                 return this.$message({
                     message: '请填写账期和工号',
                     type: 'error'
@@ -562,7 +540,7 @@ export default {
             // const fetchMonth = dayjs(this.fetchMonth).format('YYYYMM')
 
             const url = `http://service.gz.189.cn/wtcommission/index.php/api/index/${type}/AgentPointCode/${member_id}/BillingCycleID/${fetchMonth}/PageNBR/${page}`
-            console.log(url)
+            this.$logger(url)
             // 未结算数据
             // const url2 = `http://service.gz.189.cn/wtcommission/index.php/api/index/broadBandUNSettledBillDetail/AgentPointCode/WS5240/BillingCycleID/202006/PageNBR/1`
 
@@ -588,18 +566,18 @@ export default {
                     type: 'warning'
                 })*/
             }
-            console.log(`${type_text}:${member_id}: 开始采集第${page}页数据`)
+            this.$logger(`${type_text}:${member_id}: 开始采集第${page}页数据`)
             // this.fetchLogs = `${type_text}:${member_id}: 开始采集第${page}页数据`
 
             rp(options)
                 .then(async res => {
-                    // console.log(res)
+                    // this.$logger(res)
 
                     var $ = cheerio.load(res)
                     let title = $('title').text()
 
-                    console.log(`${type_text}:${member_id}: 开始采集第${page}页数据 - ${title}`)
-                    // console.log(res)
+                    this.$logger(`${type_text}:${member_id}: 开始采集第${page}页数据 - ${title}`)
+                    // this.$logger(res)
 
                     if (title === '登陆' || title === '登录') {
                         this.isLogin = false
@@ -633,7 +611,7 @@ export default {
                             log = `${type_text}:${member_id}: 没有数据`
                             vals = []
                         }
-                        console.log(log)
+                        this.$logger(log)
                         // 写入数据库
                         // this.onInsertFetchDatas(vals)
 
@@ -683,7 +661,7 @@ export default {
 
                                 // this.fetchLogs2[member_id][type_text].page.push({ page, len: vals.length })
                             } catch (err) {
-                                console.log('error', err)
+                                this.$logger('error', err)
                             }
 
                             callback(null, vals)
@@ -701,7 +679,7 @@ export default {
                     } else {
                         callback(null, [])
                     }
-                    console.log('2222222222222', err)
+                    this.$logger('2222222222222', err)
 
                     /*if (!this.fetchLogs2[member_id]) {
                         this.fetchLogs2[member_id] = {}
@@ -717,7 +695,7 @@ export default {
                             this.fetchLogs2[member_id][type_text].page.push({ page, error: err.error })
                         }
                     } catch (err) {
-                        console.log('error', err)
+                        this.$logger('error', err)
                     }*/
 
                     this.$notify.error({
@@ -737,7 +715,7 @@ export default {
                 async.mapLimit(pages, limit, this.handleRequestDatas, (err, result) => {
                     let arr = []
                     result.forEach(e => arr.push(...e))
-                    console.log(err, result)
+                    this.$logger(err, result)
                     resolve(arr)
                 })
             })
@@ -815,7 +793,7 @@ export default {
                     this.cookies = new tough.Cookie(cookies).toString()
                 })
                 .catch(err => {
-                    console.log(err)
+                    this.$logger(err)
                 })
         },
         // 登录
@@ -826,7 +804,7 @@ export default {
                     type: 'error'
                 })
             }
-            console.log({
+            this.$logger({
                 userName: this.username,
                 password: '',
                 token: this.token,
@@ -854,12 +832,12 @@ export default {
             }
             rp(options)
                 .then(body => {
-                    console.log(body)
+                    this.$logger(body)
                     if (body) {
                         let $ = cheerio.load(body)
                         let title = $('h1').text()
                         let message = $('h2').text()
-                        console.log(title, message)
+                        this.$logger(title, message)
                         if (title === '错误提示') {
                             this.$message({
                                 message: `${title}: ${message}`,
@@ -872,8 +850,8 @@ export default {
                     }
                 })
                 .catch(err => {
-                    console.log(err)
-                    console.log(err.statusCode)
+                    this.$logger(err)
+                    this.$logger(err.statusCode)
                     if (err.statusCode === 302) {
                         this.$message({
                             message: '登录成功',
@@ -1043,13 +1021,13 @@ export default {
             })
             // 获取没有找到对于业务号码的结算数据
             this.$db.get(`select count(*) as count from bill where not_found_user=1`, (err, res = []) => {
-                console.log('notfound', { err, res })
+                this.$logger('notfound', { err, res })
                 if (res) this.notFoundUserCount = res.count
             })
             // 获取本月结算成公的。
             let oq = `select count(b.id) as count from bill b left join accept a on (a.user_number=b.user_number or a.action_no=b.user_number) where a.action_no is not null and b.created between ${this.firstDay} and ${this.lastDay}`
             this.$db.get(oq, (err, res) => {
-                console.log({ res, err })
+                this.$logger({ res, err })
                 if (res) this.monthOutSuccess = res.count
             })
         },
@@ -1249,7 +1227,6 @@ export default {
             // 本月需要处理的受理清单
             // flag = 'accept_count', 'accept_length'
             // 获取受理清单
-            this.$logger({ flag })
             try {
                 let accept_count_arr = []
                 if (this.package.length) {
@@ -1258,7 +1235,6 @@ export default {
                 } else {
                     return
                 }
-                this.$logger({ accept_count_arr })
 
                 let __flag = flag === 'accept_count'
 
@@ -1283,7 +1259,7 @@ export default {
                 let datas = this.parseAoaData(accept_count_arr, json)
 
                 // 下载
-                this.onDownload(datas, `[${title}]`)
+                this.onDownload([{ datas }], title)
             } catch (err) {
                 this.outputLoading = ''
             }
@@ -1313,7 +1289,7 @@ export default {
                     })
                 })
             } else if (type === 'monthOutSuccess') {
-                title = `[${dayjs().format('YYYYMM')}导入结算清单，结算成功]`
+                title = `${dayjs().format('YYYYMM')} 结算成功 `
 
                 const sql = `select b.*,a.acceptor,a.user from bill b left join accept a on (a.user_number=b.user_number or a.action_no=b.user_number) where a.acceptor is not null and b.created between ${this.firstDay} and ${this.lastDay} group by b.id`
 
@@ -1343,18 +1319,20 @@ export default {
             datas = this.parseAoaData(datas, json)
 
             // 下载
-            const name = `[${title}]`
-            const book_name = 'book_name'
             this.$logger(datas)
 
-            this.onDownload(datas, name)
+            this.onDownload([{ datas }], title)
         },
-        onDownload(datas, name, book_name = 'book_name', excelType = 'aoa') {
+        /*
+         * 下载excel表格
+         * datas array 表格数据
+         * name string 表格名称
+         */
+        onDownload(datas, name) {
             download
-                .excel2(datas, name, book_name, excelType)
+                .excel2(datas, name)
                 .then(res => {
                     this.outputLoading = ''
-                    this.$logger(res)
                     this.$message({
                         showClose: true,
                         message: `数据表格创建${!res ? '成功' : '失败'}`,
@@ -1363,7 +1341,6 @@ export default {
                 })
                 .catch(err => {
                     this.outputLoading = ''
-                    this.$logger(err)
                 })
         },
         parseAoaData(datas, json = '') {
@@ -1375,7 +1352,6 @@ export default {
             // this.$logger(datas)
             datas = datas.map(v => {
                 return keys.map(k => {
-                    this.$logger({ k })
                     if (k === 'error') {
                         if (/UNIQUE/i.test(v[k])) {
                             return '数据已存在'
@@ -1611,7 +1587,7 @@ export default {
             // const month_sql = `select *  from(select b.*,a.acceptor,a.user from bill b left join accept a on a.action_no=b.user_number where b.date=202006 union select b.*,a.acceptor,a.user from bill b left join accept a on a.user_number=b.user_number where b.date=202006 ) where created between ${this.firstDay} and ${this.lastDay} group by id`
             const s = `select b.*,a.acceptor,a.user from bill b left join accept a on (a.user_number=b.user_number or a.action_no=b.user_number) where a.action_no is not null and b.created between ${this.firstDay} and ${this.lastDay} group by b.id`
             this.$db.all(s, (err, res) => {
-                console.log(err, res)
+                this.$logger(err, res)
             })
         }
     }

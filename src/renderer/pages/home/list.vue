@@ -244,11 +244,9 @@ export default {
                     }
 
                     let datas = this.parseAoaData(res, json)
-                    const name = `导出查询结算清单`
-                    const book_name = 'book_name'
-                    this.$logger(datas)
+                    const name = `查询 结算清单`
 
-                    this.onDownload(datas, name)
+                    this.onDownload([{ datas }], name)
                 } else {
                     this.$message({
                         showClose: true,
@@ -259,12 +257,11 @@ export default {
                 }
             })
         },
-        onDownload(datas, name, book_name = 'book_name', excelType = 'aoa') {
+        onDownload(datas, name) {
             download
-                .excel2(datas, name, book_name, excelType)
+                .excel2(datas, name)
                 .then(res => {
                     this.outputLoading = false
-                    this.$logger(res)
                     this.$message({
                         showClose: true,
                         message: `数据表格创建${!res ? '成功' : '失败'}`,
@@ -273,7 +270,6 @@ export default {
                 })
                 .catch(err => {
                     this.outputLoading = false
-                    this.$logger(err)
                 })
         },
         parseAoaData(datas, json = '') {
@@ -285,7 +281,6 @@ export default {
             // this.$logger(datas)
             datas = datas.map(v => {
                 return keys.map(k => {
-                    this.$logger({ k })
                     if (k === 'error') {
                         if (/UNIQUE/i.test(v[k])) {
                             return '数据已存在'

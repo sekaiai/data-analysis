@@ -18,13 +18,21 @@
         </div>
         <div class="table-box flex1">
             <el-table :data="datas" height="60vh">
-                <el-table-column prop="name" label="发展套餐名称"> </el-table-column>
+                <el-table-column type="expand">
+                    <template slot-scope="props">
+                        <div class="flex-item">
+                            <div class="title">结算说明</div>
+                            <div class="desc">{{ props.row.law_desc || '-' }}</div>
+                        </div>
+                    </template>
+                </el-table-column>
+
+                <el-table-column prop="name" label="发展套餐名称" width="300"> </el-table-column>
                 <el-table-column prop="__count" label="本月待结算受理数"></el-table-column>
                 <el-table-column prop="__nums" label="本月待受理清单"></el-table-column>
                 <el-table-column prop="accept_count" label="关联受理清单"></el-table-column>
                 <el-table-column prop="law" label="结算规律"> </el-table-column>
                 <el-table-column prop="count" label="结算次数"> </el-table-column>
-                <el-table-column prop="law_desc" label="结算说明"> </el-table-column>
                 <el-table-column fixed="right" label="操作" width="120">
                     <template slot-scope="scope">
                         <el-button @click.native.prevent="handleDeleteRow(scope.$index)" type="text" size="small">

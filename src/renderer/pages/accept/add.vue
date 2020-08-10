@@ -4,19 +4,12 @@
         <div style="margin-bottom: 20px">本月已导入{{ monthLength }}条数据</div>
         <div class="form-line">
             <div class="flex">
-                <!-- <el-upload class="upload-demo" ref="upload" multiple accept='.xls,.xlsx' action="/" :auto-upload="false"> -->
-                <!-- <el-button slot="trigger" size="small" type="primary">选取文件</el-button> -->
-                <!-- <el-button slot="trigger" type="primary" :loading="loading">导入用户表<i class="el-icon-upload"></i></el-button> -->
-                <!-- </el-upload> -->
                 <el-button type="primary" @click="submitUpload">
                     <template v-if="datas.length">
                         <span>重新</span>
                     </template>
                     选择受理清单文件</el-button
                 >
-                <!-- <div slot="tip" @click="logsVisible = true" class="el-upload__tip" v-if="logs.length">
-                    解析记录
-                </div> -->
             </div>
         </div>
         <template v-if="logs.length">
@@ -43,23 +36,6 @@
                     >
                 </div>
             </div>
-        </div>
-        <div class="data-analysis ">
-            <!--           <el-tabs v-model="analysisActiveName" @tab-click="handleTabsChange">
-                <el-tab-pane name="all">
-                    <span slot="label">
-                        数据总行数 <span class="link">({{ datas.length }})</span></span>
-                </el-tab-pane>
-                <el-tab-pane name="success">
-                    <span slot="label">
-                        成功数 <span class="link">({{ success.length }})</span></span>
-                </el-tab-pane>
-                <el-tab-pane name="error">
-                    <span slot="label">
-                        已存在 <span class="link">({{ error.length }})</span></span>
-                </el-tab-pane>
-            </el-tabs> -->
-            <!-- <el-button class="button" type="success" @click="handleAnalysisDownload" size="mini">导出该分类数据</el-button> -->
         </div>
     </div>
 </template>
@@ -151,15 +127,8 @@ export default {
                 }
             })
         },
-        handleDisplayLogs() {
-            // 显示解析记录
-        },
         handleCurrentChange(page) {
             this.page = page
-        },
-        handleTabsChange(e) {
-            // tabs 切换
-            this.$logger(e)
         },
         handleAnalysisDownload(type) {
             // const type = this.analysisActiveName
@@ -179,36 +148,8 @@ export default {
             } else if (type === 'error') {
                 txt = '写入失败（已存在）'
             }
-            this.$logger(type, datas)
-            this.$logger('handleAnalysisDownload')
 
-            const name = `[${txt}]`
-            const book_name = 'book_name'
-            this.$logger(datas)
-
-            download.excel2(datas, name, book_name, 'json')
-
-            /*     this.$confirm(`要下载「${txt}」xlsx吗？`, '提示', {
-                confirmButtonText: '确定',
-                cancelButtonText: '取消',
-                type: 'info '
-            }).then(() => {
-                // 下载
-                // datas = this.parseAoaData(datas)
-
-            })*/
-        },
-        parseAoaData(datas) {
-            const line1 = Object.values(this.items)
-            const keys = Object.keys(this.items)
-            this.$logger({ line1, keys })
-            this.$logger({ datas })
-            datas = datas.map(v => {
-                return keys.map(k => v[k])
-            })
-            datas.unshift(line1)
-            this.$logger(datas)
-            return datas
+            download.excel2([{ datas, name: txt, bookName: txt, type: 'json' }])
         },
 
         submitUpload() {

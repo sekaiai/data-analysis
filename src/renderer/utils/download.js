@@ -11,32 +11,37 @@ import xlsx from 'xlsx'
 
 /**
  * 导出Excel
- * @param  {[type]} datas     json or array excel data
+ * @param  {Array} datas      [{datas, name = '', book_name = 'sheet1}]
  * @param  {String} filename  文件名
  * @param  {String} book_name [description]
  * @return {[type]}           [description]
  */
-const excel2 = (datas, name = '', book_name = 'sheet1', type = 'aoa') => {
+const excel2 = (datas, name = '') => {
     return new Promise((resolve, reject) => {
         // 1. data转成表
         // aoa_to_sheet 数组转表
         // json_to_sheet
-        let sheet
-        if (type === 'aoa') {
-            sheet = xlsx.utils.aoa_to_sheet(datas)
-        } else {
-            sheet = xlsx.utils.json_to_sheet(datas)
+        // const sheet = []
+        const workBook = xlsx.utils.book_new()
+
+        for (var i = 0; i < datas.length; i++) {
+            const { datas: data, type = 'aoa', bookName = `sheet${i + 1}` } = datas[i]
+
+            let _sheet
+            if (type === 'aoa') {
+                _sheet = xlsx.utils.aoa_to_sheet(data)
+            } else {
+                _sheet = xlsx.utils.json_to_sheet(data)
+            }
+
+            xlsx.utils.book_append_sheet(workBook, _sheet, bookName)
         }
 
-        const workBook = xlsx.utils.book_new()
-        xlsx.utils.book_append_sheet(workBook, sheet, book_name)
-
-        sheet = xlsx.write(workBook, {
+        const sheet = xlsx.write(workBook, {
             bookType: 'xlsx', // 输出的文件类型
             type: 'buffer', // 输出的数据类型
             compression: true // 开启zip压缩
         })
-
         // 表格数据拟定为 data
         const excelModel = new Blob([sheet], { type: 'application/octet-stream' })
 
@@ -50,8 +55,8 @@ const excel2 = (datas, name = '', book_name = 'sheet1', type = 'aoa') => {
         reader.addEventListener('loadend', () => {
             // reader.result 包含被转化为类型数组 typed array 的 blob
             // 向主进程发送下载excel消息
-            const filename = `${name}_${day().format('YYYY-MM-DD_HH-mm-ss')}.xlsx`
-            let dataBuffer = Buffer.from(reader.result.split('base64,')[1], 'base64')
+            const filename = `${name} ${day().format('YYYY-MM-DD HH-mm-ss')}.xlsx`
+            const dataBuffer = Buffer.from(reader.result.split('base64,')[1], 'base64')
 
             ipcRenderer.send('outputExcel', {
                 datas: dataBuffer,
