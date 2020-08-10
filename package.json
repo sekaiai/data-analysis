@@ -7,7 +7,7 @@
   "main": "./dist/electron/main.js",
   "repository": {
     "type": "git",
-    "url": "git@github.com:sekaiai/easy-invoices2.git"
+    "url": "git@github.com:sekaiai/data-analysis.git"
   },
   "keywords": [
     "electron",
