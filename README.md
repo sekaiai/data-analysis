@@ -1,5 +1,9 @@
 ### readme
 
+forked from [easy-invoices](https://github.com/CaanDoll/easy-invoices)
+sqlite3 实在装不上就用 easy-invoices 改了
+需求不明确，东改西改所以有超过 70%无用代码
+
 **注意**
 
 1. 所有结算结果数据依赖套餐(结算规则)
