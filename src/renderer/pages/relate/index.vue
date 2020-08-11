@@ -155,7 +155,7 @@ export default {
         if (e && e['业务号码']) {
           let vals = values.map(k => e[k]).join(`','`)
           // this.$logger(vals)
-          const sql = `INSERT INTO related_user (${keys}) values ('${vals}')`
+          const sql = `REPLACE INTO related_user (${keys}) values ('${vals}')`
           await new Promise(reslove => {
             this.$db.run(sql, (err, res) => {
               // this.$logger({ err, res })

@@ -57,10 +57,17 @@ db.serialize(() => {
         }
     )
 
-    db.run(`CREATE UNIQUE INDEX action_no ON accept (action_no)`, err => {
+    db.run('DROP INDEX `action_no` ON `accept`', (err, res) => {
+        console.log({ err, res })
+    })
+
+    db.run(`CREATE UNIQUE INDEX action_no ON accept (action_no,product_main)`, err => {
         console.log(err)
     })
 
+    db.run(`CREATE INDEX action_no ON accept (action_no)`, err => {
+        console.log(err)
+    })
     db.run(`CREATE INDEX user_number ON accept (user_number)`, err => {
         console.log(err)
     })
@@ -213,6 +220,77 @@ a6 varchar(200)
         console.log(err)
     })
     db.run(`create index a ON related_user (a2,a3,a4,a5,a6)`, err => {
+        console.log(err)
+    })
+
+    /**
+    date: varchar(200) NOT NULL, //'账期',
+    local: '本地网',
+    company: '县公司',
+    jf_type: '积分类型',
+    event_name: '活动名称',
+    jf_name: '积分规则名称',
+    xs_id: '销售人员工号',
+    xs_name: '销售人员',
+    md_id: '门店工号',
+    md_code: '门店编码',
+    md_name: '门店名称',
+    cp_type: '产品名称',
+    user_id: '用户ID',
+    user_number: '用户号码',
+    xs_instance_id: '销售品实例ID',
+    rw_name: '入网套餐',
+    rw_date: '入网时间',
+    hyjh: '合约计划',
+    jf_jiesuan: '结算积分',
+    bqdh: '本期兑换',
+    qs: '清算',
+    ydjf: '应兑换积分'
+    */
+    db.run(
+        `CREATE TABLE IF NOT EXISTS jifen(
+        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+        date varchar(200) NOT NULL,
+        local varchar(200),
+        company varchar(200),
+        jf_type varchar(200),
+        jf_name varchar(200),
+        event_name varchar(200),
+        xs_id varchar(200),
+        xs_name varchar(200),
+        md_id varchar(200),
+        md_code varchar(200),
+        md_name varchar(200),
+        cp_type varchar(200),
+        user_id varchar(200),
+        user_number varchar(200),
+        xs_instance_id varchar(200),
+        rw_name varchar(200),
+        rw_date varchar(200),
+        hyjh varchar(200),
+        jf_jiesuan varchar(200),
+        bqdh varchar(200),
+        qs varchar(200),
+        ydjf varchar(200),
+        created_at varchar(200)
+        )`,
+        err => {
+            logger(err)
+        }
+    )
+    db.run(`create index jifen_date ON related_user (date)`, err => {
+        console.log(err)
+    })
+    db.run(`create index jifen_user_member ON related_user (user_member)`, err => {
+        console.log(err)
+    })
+    db.run(`create index jifen_rw_name ON related_user (rw_name)`, err => {
+        console.log(err)
+    })
+    db.run(`create index jifen_xs_name ON related_user (xs_name)`, err => {
+        console.log(err)
+    })
+    db.run(`create index jifen_xs_instance_id ON related_user (xs_instance_id)`, err => {
         console.log(err)
     })
 })

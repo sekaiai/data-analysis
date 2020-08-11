@@ -41,6 +41,11 @@ export default new Router({
             component: require('@/pages/home/list.vue').default
         },
         {
+            path: '/bill/jifen',
+            name: 'bill.jifen',
+            component: require('@/pages/home/jf_list.vue').default
+        },
+        {
             path: '/accept',
             name: 'accept',
             component: require('@/pages/accept/index.vue').default

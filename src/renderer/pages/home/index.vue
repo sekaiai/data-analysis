@@ -1,5 +1,91 @@
 <template>
     <div id="home" v-loading.lock="loading" :element-loading-text="`正在解析数据`">
+        <!-- 账期分析 start-->
+        <div>
+            <div class="title-line">账期分析</div>
+
+            <p>
+                本月需要结算的清单数量<span>{{ accept_count }}</span>
+                <el-button
+                    v-if="accept_count"
+                    :loading="outputLoading === 'accept_count'"
+                    type="text"
+                    size="mini"
+                    @click="onFetchAccept('accept_count')"
+                >
+                    (导出)
+                </el-button>
+                条
+            </p>
+            <p>
+                本月需要结算受理清单<span>{{ accept_length }}</span>
+                <el-button
+                    v-if="accept_count"
+                    :loading="outputLoading === 'accept_length'"
+                    type="text"
+                    size="mini"
+                    @click="onFetchAccept('accept_length')"
+                    >(导出)
+                </el-button>
+                条
+            </p>
+            <p>
+                本月已导入<span
+                    >{{ monthInsertSuccessCount + monthInsertErrorCount
+                    }}<el-button v-if="monthInsertSuccessCount" type="text" size="mini" @click="router2bill(`month`)"
+                        >(查看)</el-button
+                    ></span
+                >结算清单
+            </p>
+            <p>
+                本月导入（成功）<span>{{ monthInsertSuccessCount }}</span>
+                <el-button v-if="monthInsertSuccessCount" type="text" size="mini" @click="router2bill(`monthSuccess`)"
+                    >(查看)</el-button
+                >结算清单
+            </p>
+
+            <p>
+                本月导入（失败）<span>{{ monthInsertErrorCount }}</span>
+                <el-button v-if="monthInsertErrorCount" type="text" size="mini" @click="router2bill(`monthError`)"
+                    >(查看)</el-button
+                >结算清单
+            </p>
+            <p>
+                本月结算（成功）<span>{{ monthOutSuccess }}</span>
+                <el-button
+                    v-if="monthOutSuccess"
+                    :loading="outputLoading === 'monthOutSuccess'"
+                    type="text"
+                    size="mini"
+                    @click="handleAnalysisDownload('monthOutSuccess')"
+                    >(导出)</el-button
+                >结算清单
+            </p>
+            <p>
+                所有结算未找到受理用户<span>{{ notFoundUserCount }}</span>
+                <el-button
+                    v-if="notFoundUserCount"
+                    type="text"
+                    size="mini"
+                    :loading="outputLoading === 'notFoundUserCount'"
+                    @click="handleAnalysisDownload(`notFoundUserCount`)"
+                    >(导出)</el-button
+                >条
+            </p>
+
+            <div>
+                <el-button type="success" @click="handleUpdate" :loading="uploadloading">
+                    重新统计{{ uploadloading ? '中...' : '数据' }}
+                </el-button>
+                <el-button type="default" @click="onRouterList">查看结算清单</el-button>
+                <el-button type="default" @click="onRouterList('jf')">查看积分清单</el-button>
+
+                <!-- <el-button type="default" @click="handleClearData">删除所有数据(包括历史数据)</el-button> -->
+            </div>
+        </div>
+        <!-- 账期分析 end-->
+
+        <!-- 采集dialog start -->
         <div class="fetch-datas-box">
             <el-dialog :close-on-click-modal="false" title="登录" :visible.sync="loginVisible" width="380px">
                 <div class="flex">
@@ -33,6 +119,7 @@
                 </div>
             </el-dialog>
         </div>
+        <!-- 采集dialog end -->
 
         <div class="title-line">结算分析</div>
         <div class="form-line">
@@ -41,7 +128,10 @@
             <el-button type="primary" :loading="fetchLoading" v-else="isLogin" @click="fetchBoxVisible = true">{{
                 fetchLoading ? '正在采集数据' : '获取远程数据'
             }}</el-button>
+
+            <el-button @click="uploadJifen" :loading="loadingJifen">导入积分清单</el-button>
         </div>
+
         <div class="title-line">导入结算表分析</div>
 
         <div class="logs">
@@ -89,6 +179,7 @@
         <p>结算成功：{{ importSuccessCount }}</p>
         <p>结算数据：{{ importErrorCount }}</p>
         <p>共有数据：{{ datas.length }}</p>
+        <p>写入积分清单：{{ insertJifenCount }}条</p>
         <p>写入数据成功：{{ insertSuccessCount }}条</p>
         <p>
             写入失败数据：{{ insertError.length }}条
@@ -101,84 +192,6 @@
                 >(导出)</el-button
             >
         </p>
-        <div class="title-line">账期分析</div>
-
-        <p>
-            本月需要结算的清单数量<span>{{ accept_count }}</span>
-            <el-button
-                v-if="accept_count"
-                :loading="outputLoading === 'accept_count'"
-                type="text"
-                size="mini"
-                @click="onFetchAccept('accept_count')"
-            >
-                (导出)
-            </el-button>
-            条
-        </p>
-        <p>
-            本月需要结算受理清单<span>{{ accept_length }}</span>
-            <el-button
-                v-if="accept_count"
-                :loading="outputLoading === 'accept_length'"
-                type="text"
-                size="mini"
-                @click="onFetchAccept('accept_length')"
-                >(导出)
-            </el-button>
-            条
-        </p>
-        <p>
-            本月已导入<span
-                >{{ monthInsertSuccessCount + monthInsertErrorCount
-                }}<el-button v-if="monthInsertSuccessCount" type="text" size="mini" @click="router2bill(`month`)"
-                    >(查看)</el-button
-                ></span
-            >结算清单
-        </p>
-        <p>
-            本月导入（成功）<span>{{ monthInsertSuccessCount }}</span>
-            <el-button v-if="monthInsertSuccessCount" type="text" size="mini" @click="router2bill(`monthSuccess`)"
-                >(查看)</el-button
-            >结算清单
-        </p>
-
-        <p>
-            本月导入（失败）<span>{{ monthInsertErrorCount }}</span>
-            <el-button v-if="monthInsertErrorCount" type="text" size="mini" @click="router2bill(`monthError`)"
-                >(查看)</el-button
-            >结算清单
-        </p>
-        <p>
-            本月结算（成功）<span>{{ monthOutSuccess }}</span>
-            <el-button
-                v-if="monthOutSuccess"
-                :loading="outputLoading === 'monthOutSuccess'"
-                type="text"
-                size="mini"
-                @click="handleAnalysisDownload('monthOutSuccess')"
-                >(导出)</el-button
-            >结算清单
-        </p>
-        <p>
-            所有结算未找到受理用户<span>{{ notFoundUserCount }}</span>
-            <el-button
-                v-if="notFoundUserCount"
-                type="text"
-                size="mini"
-                :loading="outputLoading === 'notFoundUserCount'"
-                @click="handleAnalysisDownload(`notFoundUserCount`)"
-                >(导出)</el-button
-            >条
-        </p>
-
-        <div>
-            <el-button type="success" @click="handleUpdate" :loading="uploadloading">
-                重新统计{{ uploadloading ? '中...' : '数据' }}
-            </el-button>
-            <el-button type="default" @click="onRouterList">查看历史数据</el-button>
-            <!-- <el-button type="default" @click="handleClearData">删除所有数据(包括历史数据)</el-button> -->
-        </div>
     </div>
 </template>
 <script>
@@ -296,6 +309,33 @@ export default {
                 status: '是否成功结算',
                 cause: '原因',
                 branch: '网点名称'
+            },
+            loadingJifen: false,
+            insertJifenCount: 0,
+            insertJFError: [],
+            jifenColumns: {
+                date: '账期',
+                local: '本地网',
+                company: '县公司',
+                jf_type: '积分类型',
+                jf_name: '积分规则名称',
+                event_name: '活动名称',
+                xs_id: '销售人员工号',
+                xs_name: '销售人员',
+                md_id: '门店工号',
+                md_code: '门店编码',
+                md_name: '门店名称',
+                cp_type: '产品名称',
+                user_id: '用户ID',
+                user_number: '用户号码',
+                xs_instance_id: '销售品实例ID',
+                rw_name: '入网套餐',
+                rw_date: '入网时间',
+                hyjh: '合约计划',
+                jf_jiesuan: '结算积分',
+                bqdh: '本期兑换',
+                qs: '清算',
+                ydjf: '应兑换积分'
             }
         }
     },
@@ -336,6 +376,109 @@ export default {
         }
     },
     methods: {
+        async uploadJifen() {
+            // 上传积分
+            let fileList = this.$electron.remote.dialog.showOpenDialog({
+                properties: ['openFile', 'multiSelections'],
+                filters: { name: 'xlsx', extensions: ['xlsx', 'xls'] }
+            })
+
+            if (!fileList || fileList.length < 1) {
+                this.$message({
+                    message: '没有获取到相关文件',
+                    type: 'error'
+                })
+                return
+            }
+            this.loadingJifen = true
+
+            this.tableNum = fileList
+
+            for (var i = 0; i < fileList.length; i++) {
+                await this.onOpenFile2(fileList[i], i)
+            }
+
+            this.loadingJifen = false
+        },
+        async onOpenFile2(path, i) {
+            // 获取数据
+            const excelBuffer = fs.readFileSync(path)
+
+            // 解析数据
+            var result = xlsx.read(excelBuffer, {
+                type: 'buffer',
+                cellHTML: false
+            })
+
+            // this.result = result
+            const now = dayjs().unix()
+
+            // 分析数据
+            const _data = []
+            const fun = []
+            // let keys = Object.keys(this.jifenColumns).join(',')
+
+            result.SheetNames.forEach(key => {
+                let json = xlsx.utils.sheet_to_json(result.Sheets[key])
+                // console.log(json)
+
+                json = json.map(e => {
+                    let obj = {
+                        created_at: now
+                    }
+                    for (let k in this.jifenColumns) {
+                        let v = this.jifenColumns[k]
+                        if (k === 'date') {
+                            obj.date = e['账期'] || e['帐期']
+                        } else if (k === 'rw_date') {
+                            obj.rw_date = dayjs(e[v]).unix()
+                        } else {
+                            obj[k] = e[v]
+                        }
+                    }
+
+                    // let values = Object.values(e)
+                    //     .slice(0, 20)
+                    //     .join(`','`)
+                    // console.log(Object.values(e), Object.values(e).length, Object.keys(this.jifenColumns), Object.keys(this.jifenColumns).length)
+                    fun.push(this.insertJifen(obj))
+                    return obj
+                })
+
+                // 插入数据库
+                if (key === '成功' || key === '失败') {
+                    _data.push(...json)
+                }
+            })
+
+            var promiseData = await Promise.all(fun)
+            this.$logger('Promise', promiseData)
+
+            this.datas = _data
+            this.handleParseLose()
+        },
+        insertJifen(datas) {
+            return new Promise(resolve => {
+                let keys = Object.keys(datas).join(',')
+                let values = Object.values(datas).join(`','`)
+
+                console.log(keys, values)
+
+                // 插入数据库
+                const sql = `replace into jifen (${keys}) values ('${values}')`
+                this.$logger(sql)
+                this.$db.run(sql, err => {
+                    if (err) {
+                        this.$logger('插入数据错误', err)
+                        // datas.error = err.toString()
+                        // this.insertJFError.push(datas)
+                    } else {
+                        this.insertJifenCount++
+                    }
+                    resolve(err)
+                })
+            })
+        },
         // 先获取所有网点
         fetchWangdian() {
             if (!this.fetchMonth) {
@@ -892,11 +1035,10 @@ export default {
         async onUpdate() {
             this.uploadloading = true
             // 更新所有数据
-            const sql = `select user_number,count(user_number) as count from bill group by user_number`
+            const sql = `select user_number,count(user_number) as count,package_name from bill group by user_number,package_name union all select user_number,count(user_number) as count,rw_name as package_name from jifen group by user_number,package_name`
+
             const bills = await new Promise(resolve => {
                 this.$db.all(sql, (err, res = []) => {
-                    this.$logger(err, res)
-                    // let _sql = ``
                     resolve(res)
                 })
             })
@@ -976,8 +1118,13 @@ export default {
                 }
             })
         },
-        onRouterList() {
-            this.$router.push('/bill/list')
+        onRouterList(v) {
+            if (v === 'jf') {
+                v = '/bill/jifen'
+            } else {
+                v = '/bill/list'
+            }
+            this.$router.push(v)
         },
         handleClearData() {
             this.$confirm(`这个会删除本地所有已保存的清单列表。`, '提示', {
@@ -1024,7 +1171,7 @@ export default {
                 this.$logger('notfound', { err, res })
                 if (res) this.notFoundUserCount = res.count
             })
-            // 获取本月结算成公的。
+            // 获取本月结算成功的。
             let oq = `select count(b.id) as count from bill b left join accept a on (a.user_number=b.user_number or a.action_no=b.user_number) where a.action_no is not null and b.created between ${this.firstDay} and ${this.lastDay}`
             this.$db.get(oq, (err, res) => {
                 this.$logger({ res, err })
@@ -1032,7 +1179,10 @@ export default {
             })
         },
 
-        // 获取本月待计算受理数
+        /*
+         * 获取本月待计算受理数
+         * vals  所有套餐
+         **/
         async onFetchSettle(vals) {
             // 1. 先通过套餐获取对应的受理清单（结算次数）
             // 2. 循环所有，判断月份
@@ -1042,6 +1192,7 @@ export default {
                 // this.$logger(name, count)
                 // a.date_end,a.js_count
                 const sql = `select a.* from accept as a where a.js_count < ${count} and product_main='${name}'`
+
                 const data = await new Promise(resolve => {
                     this.$db.all(sql, (err, res = []) => {
                         if (!err) {
@@ -1065,10 +1216,21 @@ export default {
             this.$logger({ accept_arr })
             return accept_arr
         },
+        /*
+         * 统计本月需要计算的数量
+         * item objtct 单个套餐
+         * vals arry 当前套餐下所有受理清单
+         **/
         async onCalcCountColums(item, vals) {
-            // 统计本月需要计算的数量
+            //
             // this.$logger({ item })
             let accept_count_arr = []
+            /**
+             * name: 套餐名称
+             * count： 结算次数
+             * law: 结算规律
+             * id: id
+             */
             let { name, count, law, id } = item
 
             const now = dayjs().format('YYYYMM')
@@ -1125,7 +1287,7 @@ export default {
                         // this.$logger('找出结算成功的数据 __count', __count)
                         if (__count.length) {
                             // 找出结算成功的数据
-                            let sql = `select date from bill where user_number='${e.action_no}' and status=1`
+                            let sql = `select date from bill where user_number='${e.action_no}' and status=1 and package_name='${e.package_name}' union all select date from jifen where user_number='${e.action_no}' and rw_name='${e.package_name}'`
 
                             const qd = await new Promise(resolve => {
                                 this.$db.all(sql, (err, res) => {
@@ -1391,12 +1553,7 @@ export default {
             for (var i = 0; i < fileList.length; i++) {
                 await this.onOpenFile(fileList[i], i)
             }
-            // fileList.forEach((e, i) => {
-            //     this.onOpenFile(e, i)
-            // })
             this.loading = false
-
-            // this.onOpenFile(input.files)
         },
         onParseSuccess(key) {
             let arr = []
@@ -1450,43 +1607,17 @@ export default {
                 })
 
                 // 插入数据库
-
                 if (key === '成功' || key === '失败') {
-                    // if (key === '成功') {
-                    // } else if (key === '失败') {
-                    //     // this.$logger({ json })
-                    // }
                     _data.push(...json)
                 }
-                // this.$logger({ json })
             })
 
             var promiseData = await Promise.all(fun)
-            this.$logger('Promise', promiseData)
 
             // 分析未找到数据
             this.datas = _data
-            /*
-             * date: 账期
-             * order_id: 订单号
-             * complete_date: 竣工时间
-             * commission_policy: 佣金结算策略
-             * commission_type: 佣金结算类型
-             * commission_money: 佣金金额
-             * package_name: 套餐名称
-             * product_name: 产品名称
-             * user_id: 用户ID
-             * user_number: 用户号码
-             * status: 是否结算成功
-             * cause: 原因
-             * branch: 网点
-             */
-            // 返回用户号码，用来做查询
-
             // 筛选数据
             this.handleParseLose()
-            // })
-            // download.excel('xxx.xlxs', result2)
         },
         onInsertDatas(datas, now) {
             return new Promise(resolve => {
@@ -1551,43 +1682,9 @@ export default {
             // 1.获取所有数据，然后再从user中未找到accept中不存在的数据
 
             // 查询未找到的数据
-            const sql = `select * from accept where action_no  in (${user})`
+            const sql = `select * from accept where action_no in (${user})`
             this.$db.all(sql, (err, res) => {
-                this.$logger({ err })
-                this.$logger(res)
-
-                // {
-                //                 no: '购物车流水号',
-                //                 area: '地区',
-                //                 addr: '渠道名称',
-                //                 acceptor: '受理人',
-                //                 product_name: '产品名称',
-                //                 product_type: '角色名称',
-                //                 product_main: '所属主销售品',
-                //                 action: '业务动作',
-                //                 action_no: '业务号码',
-                //                 created: '受理时间',
-                //                 status: '工单状态',
-                //                 date_end: '竣工时间',
-                //                 user: '揽收人',
-                //                 remark: '备注',
-                //                 import_date: '导入时间'
-                //             }
-
                 this.notfound = res
-            })
-        },
-        handleAnalysisClick(e) {
-            this.$logger(e)
-            // 数据分析tab点击事件
-        },
-        handleMonthAccept() {
-            // 本月已结算的
-            // 1. 查询所有本月结算清单关联结算表
-            // const month_sql = `select *  from(select b.*,a.acceptor,a.user from bill b left join accept a on a.action_no=b.user_number where b.date=202006 union select b.*,a.acceptor,a.user from bill b left join accept a on a.user_number=b.user_number where b.date=202006 ) where created between ${this.firstDay} and ${this.lastDay} group by id`
-            const s = `select b.*,a.acceptor,a.user from bill b left join accept a on (a.user_number=b.user_number or a.action_no=b.user_number) where a.action_no is not null and b.created between ${this.firstDay} and ${this.lastDay} group by b.id`
-            this.$db.all(s, (err, res) => {
-                this.$logger(err, res)
             })
         }
     }
