@@ -261,10 +261,10 @@ export default {
         // 获取受理清单列表， name = 套餐名称
         fetchAcceptLists(name) {
             return new Promise(reslove => {
-                const sql = `select * from accept where name = '${name}'`
-                this.$db.all(sql, (err, res = []) => {
-                    console.log(res)
-                    reslove(res)
+                const sql = `select * from accept where product_main = '${name}'`
+                this.$db.get(sql, (err, res = []) => {
+                    console.log('fetchAcceptLists', err, res)
+                    reslove([res])
                 })
             })
         },
@@ -286,20 +286,44 @@ export default {
             law_js.length = count_js
             law_js = Array.from(law_js, e => e | 0 || 1)
 
+            // 组装每月结算间隔
+            law_jf = law_jf.toString().split(',')
+            law_jf.length = count_js
+            law_jf = Array.from(law_jf, e => e | 0 || 1)
+
             console.log({ law_js, accepts })
 
             for (let i = 0; i < accepts.length; i++) {
-                let { date_end } = accepts[i]
-                let date = dayjs.unix(date_end).format('YYYYMM')
+                let { date_end, id: accept_id } = accepts[i]
+                let date_jf = dayjs.unix(date_end).format('YYYYMM')
+                let date_js = date_jf
 
+                // 创建结算(js)清单账期数据
                 for (let i = 0; i < law_js.length; i++) {
-                    console.log(date, law_js[i], dayjs(date, 'YYYYMM').add(law[i], 'month'))
+                    date_js = dayjs(date_js, 'YYYYMM')
+                        .add(law_js[i], 'month')
+                        .format('YYYYMM')
 
-                    /*let params = {
-                        list_id,
-                                    pgk_id: id
-                                    date
-                    }*/
+                    this.$db.run(
+                        `insert into zhangqi (list_id, pgk_id, date, type) values (${accept_id},${id},${date_js}, 1)`,
+                        (err, res) => {
+                            console.log('zhangqi', err, res)
+                        }
+                    )
+                }
+
+                // 创建结算积分(jf)账期数据
+                for (let i = 0; i < law_jf.length; i++) {
+                    date_jf = dayjs(date_jf, 'YYYYMM')
+                        .add(law_jf[i], 'month')
+                        .format('YYYYMM')
+
+                    this.$db.run(
+                        `insert into zhangqi (list_id, pgk_id, date, type) values (${accept_id},${id},${date_jf}, 2)`,
+                        (err, res) => {
+                            console.log('zhangqi ', err, res)
+                        }
+                    )
                 }
             }
         },
