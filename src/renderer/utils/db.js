@@ -1,7 +1,7 @@
 import fse from 'fs-extra'
 import path from 'path'
 import sq3 from 'sqlite3'
-import logger from './logger'
+// import console.log from './console.log'
 import { docDir } from './settings'
 // 将数据存至系统用户目录，防止用户误删程序
 export const dbPath = path.join(docDir, 'data.sqlite3')
@@ -53,7 +53,7 @@ db.serialize(() => {
       user_number VARCHAR(255)
   )`,
         err => {
-            logger(err)
+            console.log(err)
         }
     )
 
@@ -84,26 +84,30 @@ db.serialize(() => {
     /**
      * 结算规则表 package
      * name: 套餐名称
-     * count： 结算次数
-     * law: 结算规律
-     * law: 结算规律说明
+     * count_js： 结算结算次数
+     * count_jf： 积分结算次数
+     * law_js:   结算清单结算规律
+     * law_jf:   积分结算规律
+     * law_desc: 结算规律说明
      */
     // db.run(`drop table package`)
+
     db.run(
-        `CREATE TABLE package(
-    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-     name VARCHAR(255) NOT NULL,
-     count VARCHAR(255) NOT NULL,
-     law VARCHAR(255) NOT NULL,
+        `CREATE TABLE pgk(
+     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+     name VARCHAR(200) NOT NULL,
+     count_js INTEGER NOT NULL,
+     count_jf INTEGER NOT NULL,
+     law_js VARCHAR(255) NOT NULL,
+     law_jf VARCHAR(255) NOT NULL,
      law_desc VARCHAR(255)
-     
     )`,
         err => {
-            logger(err)
+            console.log(err && err.message)
         }
     )
 
-    db.run(`CREATE UNIQUE INDEX name ON package (name)`, err => {
+    db.run(`CREATE UNIQUE INDEX package_name ON pgk (name)`, err => {
         console.log(err)
     })
 
@@ -149,7 +153,7 @@ created varchar(200),
 branch_id varchar(100)
     )`,
         err => {
-            logger(err)
+            console.log(err)
         }
     )
 
@@ -212,7 +216,7 @@ a5 varchar(200),
 a6 varchar(200)
     )`,
         err => {
-            logger(err)
+            console.log(err)
         }
     )
 
@@ -275,7 +279,7 @@ a6 varchar(200)
         created_at varchar(200)
         )`,
         err => {
-            logger(err)
+            console.log(err)
         }
     )
     db.run(`create index jifen_date ON related_user (date)`, err => {
@@ -291,6 +295,39 @@ a6 varchar(200)
         console.log(err)
     })
     db.run(`create index jifen_xs_instance_id ON related_user (xs_instance_id)`, err => {
+        console.log(err)
+    })
+
+    /**
+     * 账期表
+     * 储存每个受理清单的所有结算账期
+     */
+    db.run(
+        `CREATE TABLE IF NOT EXISTS zhangqi(
+        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+        list_id INTEGER NOT NULL,
+        pgk_id INTEGER NOT NULL,
+        date varchar(10) NOT NULL,
+        state INTEGER DEFAULT 0
+        )`,
+        err => {
+            console.log(err)
+        }
+    )
+
+    db.run(`create index zhangqi_list_id ON zhangqi (list_id)`, err => {
+        console.log(err)
+    })
+
+    db.run(`create index zhangqi_pgk_id ON zhangqi (pgk_id)`, err => {
+        console.log(err)
+    })
+
+    db.run(`create index zhangqi_date ON zhangqi (date)`, err => {
+        console.log(err)
+    })
+
+    db.run(`create index zhangqi_state ON zhangqi (state)`, err => {
         console.log(err)
     })
 })
