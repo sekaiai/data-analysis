@@ -37,7 +37,7 @@
                 <el-table-column prop="count_jf" label="结算次数（积分）"> </el-table-column>
                 <el-table-column fixed="right" label="操作" width="120">
                     <template slot-scope="scope">
-                        <el-button @click.native.prevent="deleteTaocan(scope.$index)" type="text" size="small">
+                        <el-button @click.native.prevent="deleteTaocan(scope.row.id)" type="text" size="small">
                             删除
                         </el-button>
                         <el-button @click.native.prevent="editTaocan(scope.row)" type="text" size="small">
@@ -276,8 +276,11 @@ export default {
          */
         async updateZhangqi(id) {
             // const  = res
+            // todo: 计算结算清单和积分清单
 
             let { name, count_js, count_jf, law_jf, law_js } = await this.fetchTaocanItem(id)
+
+            await this.deleteZhangqi(id)
 
             let accepts = await this.fetchAcceptLists(name)
 
@@ -288,10 +291,10 @@ export default {
 
             // 组装每月结算间隔
             law_jf = law_jf.toString().split(',')
-            law_jf.length = count_js
+            law_jf.length = count_jf
             law_jf = Array.from(law_jf, e => e | 0 || 1)
 
-            console.log({ law_js, accepts })
+            console.log({ law_jf, law_js, accepts })
 
             for (let i = 0; i < accepts.length; i++) {
                 let { date_end, id: accept_id } = accepts[i]
@@ -335,19 +338,21 @@ export default {
          * id int 套餐ID
          */
         deleteZhangqi(id) {
-            const sql = `delete from zhangqi where pgk_id=${id}`
+            const sql = `delete from zhangqi where pgk_id='${id}'`
             this.$db.run(sql, (err, res) => {
-                console.log(err, res)
+                console.log('deleteZhangqi', err, res)
             })
         },
-        deleteTaocan(index, rows) {
+        // 删除套餐，id: 套餐ID
+        deleteTaocan(id) {
+            console.log({ id })
             this.$confirm('确定要删除该套餐吗？', '提示', {
                 confirmButtonText: '确定',
                 cancelButtonText: '取消',
                 type: 'warning'
             })
                 .then(() => {
-                    const { id } = this.datas[index]
+                    // const { id } = this.datas[index]
                     const sql = `delete from pgk where id = ${id}`
                     this.$db.run(sql, (err, res) => {
                         this.$message({
