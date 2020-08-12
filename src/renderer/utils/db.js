@@ -301,15 +301,16 @@ a6 varchar(200)
     /**
      * 账期表
      * 储存每个受理清单的所有结算账期
-     id(自增) | 清单ID(list_id) | 套餐ID(pgk_id) | 账期(date)  | 是否已结算(state) |  结算类型(type)
+     id(自增) | 清单ID(list_id) | 套餐ID(pgk_id) | 账期(date)  | 是否已结算(state) |  结算类型(type) |  清单ID(qd_id)
      --- | --- | --- | --- | --- | ---
-     - | - | - | 202004 | 0,1 | 1:结算清单 2.积分清单
+     - | - | - | 202004 | 0:没有结算清单,1:结算成功, -1:结算失败 | 1:结算清单 2.积分清单 | 结算(积分) 清单ID
      */
     db.run(
         `CREATE TABLE IF NOT EXISTS zhangqi(
         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
         list_id INTEGER NOT NULL,
         pgk_id INTEGER NOT NULL,
+        qd_id INTEGER,
         date INTEGER NOT NULL,
         state INTEGER DEFAULT 0,
         type INTEGER DEFAULT 1
