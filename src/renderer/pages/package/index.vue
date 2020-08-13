@@ -1,5 +1,5 @@
 <template>
-    <div id="pgk">
+    <div id="pgk" v-loading.lock="loading">
         <div class="title-line" v-if="product_mains.length">
             未添加套餐<el-button @click="fetchDatas" style="margin-left: 10px;" type="text" size="mini">
                 刷新数据
@@ -67,7 +67,7 @@
                 <el-form-item prop="count_js" label="结算次数（结算清单）">
                     <!-- <el-input v-model="ruleForm['count']"></el-input> -->
                     <div class="el-input">
-                        <el-input-number v-model="ruleForm['count_js']" :min="1"></el-input-number>
+                        <el-input-number v-model="ruleForm['count_js']" :min="0"></el-input-number>
                     </div>
                 </el-form-item>
                 <el-form-item prop="law_js" label="结算规律（结算清单）">
@@ -77,7 +77,7 @@
                 <el-form-item prop="count_jf" label="结算次数（积分）">
                     <!-- <el-input v-model="ruleForm['count']"></el-input> -->
                     <div class="el-input">
-                        <el-input-number v-model="ruleForm['count_jf']" :min="1"></el-input-number>
+                        <el-input-number v-model="ruleForm['count_jf']" :min="0"></el-input-number>
                     </div>
                 </el-form-item>
                 <el-form-item prop="law_jf" label="结算规律（积分）">
@@ -96,6 +96,9 @@
 </template>
 <script>
 import dayjs from 'dayjs'
+const customParseFormat = require('dayjs/plugin/customParseFormat')
+
+dayjs.extend(customParseFormat)
 
 export default {
     data() {
@@ -114,6 +117,8 @@ export default {
             }
         }
         return {
+            dateFormatArr: ['YYYY/M/D HH:mm:ss', 'YYYY-M-D HH:mm:ss'],
+            loading: false,
             page: 1,
             product_mains: [], //所有套餐
             isShowAddTaocan: false,
@@ -121,9 +126,9 @@ export default {
             ruleForm: {
                 name: '', //名称
                 // begin: '', //开始结算月份
-                count_js: 1, //结算次数
+                count_js: 0, //结算次数
                 law_js: '', //结算规律
-                count_jf: 1, //结算次数
+                count_jf: 0, //结算次数
                 law_jf: '', //结算规律
                 law_desc: '' //规律说明
             },
@@ -152,10 +157,10 @@ export default {
             this.ruleForm = {
                 name: v, //名称
                 // begin: '', //开始结算月份
-                count_js: 1, //结算次数
+                count_js: 0, //结算次数
                 law_js: '', //结算规律
                 law_jf: '', //结算规律
-                count_jf: 1, //结算次数
+                count_jf: 0, //结算次数
                 law_desc: '' //规律说明
             }
             this.isShowAddTaocan = true
@@ -225,9 +230,12 @@ export default {
                 const values = Object.values(this.ruleForm).join(`','`)
                 sql = `INSERT INTO pgk (${keys}) VALUES ('${values}')`
             }
+            this.loading = true
             this.$db.run(sql, (err, res) => {
                 console.log('---------------', err, res)
                 if (err) {
+                    this.loading = false
+
                     this.$message({
                         type: 'error',
                         message: err.message
@@ -368,6 +376,7 @@ export default {
                 let state = status | 0
                 if (state !== 1) {
                     state = -1
+                    console.log('this.state -1', state)
                 }
                 let params = { accept_id, pgk_id, state, type: 1, date, qd_id }
                 this.updateZhangqiState(params)
@@ -401,14 +410,22 @@ export default {
             let accepts = await this.fetchAcceptLists(name)
 
             // 组装每月结算间隔
-            law_js = law_js.toString().split(',')
-            law_js.length = count_js
-            law_js = Array.from(law_js, e => e | 0 || 1)
+            if (!count_js) {
+                law_js = []
+            } else {
+                law_js = law_js.toString().split(',')
+                law_js.length = count_js
+                law_js = Array.from(law_js, e => e | 0 || 1)
+            }
 
             // 组装每月结算间隔
-            law_jf = law_jf.toString().split(',')
-            law_jf.length = count_jf
-            law_jf = Array.from(law_jf, e => e | 0 || 1)
+            if (!count_jf) {
+                law_jf = []
+            } else {
+                law_jf = law_jf.toString().split(',')
+                law_jf.length = count_jf
+                law_jf = Array.from(law_jf, e => e | 0 || 1)
+            }
 
             console.log({ law_jf, law_js, accepts })
 
@@ -442,6 +459,7 @@ export default {
             Promise.all(promiseArr).then(values => {
                 console.log('Promise all', values)
                 this.computedZhangqiState(id, name)
+                this.loading = false
             })
         },
         insertZhangqiItem(accept_id, id, date_js, type) {

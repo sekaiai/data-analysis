@@ -1,66 +1,89 @@
 <template>
     <div id="home" v-loading.lock="loading" :element-loading-text="`正在解析数据`">
-        <!-- 受理清单 start-->
-
+        <!-- 账期分析 start-->
         <div>
-            <div class="title-line">受理清单</div>
-            <el-table :data="slLists" border style="width: 100%">
-                <el-table-column prop="date" label="账期" width="180"> </el-table-column>
-                <el-table-column prop="count" label="需结算"> </el-table-column>
-                <!-- success, none, fail, jf_success, jf_fail -->
-                <el-table-column prop="none" label="结算成功"> </el-table-column>
-                <el-table-column prop="success" label="结算失败"> </el-table-column>
-                <el-table-column prop="fail" label="未结算受理（结算清单）"> </el-table-column>
-                <el-table-column prop="jf_success" label="积分清单"> </el-table-column>
-                <el-table-column prop="jf_fail" label="未结算受理（积分）"> </el-table-column>
+            <div class="title-line">账期分析</div>
 
-                <el-table-column label="操作">
-                    <template slot-scope="scope">
-                        <el-button type="text" @click="downloadSlList(scope.row.date)">下载</el-button>
-                    </template>
-                </el-table-column>
-            </el-table>
+            <p>
+                本月需要结算的清单数量<span>{{ accept_count }}</span>
+                <el-button
+                    v-if="accept_count"
+                    :loading="outputLoading === 'accept_count'"
+                    type="text"
+                    size="mini"
+                    @click="onFetchAccept('accept_count')"
+                >
+                    (导出)
+                </el-button>
+                条
+            </p>
+            <p>
+                本月需要结算受理清单<span>{{ accept_length }}</span>
+                <el-button
+                    v-if="accept_count"
+                    :loading="outputLoading === 'accept_length'"
+                    type="text"
+                    size="mini"
+                    @click="onFetchAccept('accept_length')"
+                    >(导出)
+                </el-button>
+                条
+            </p>
+            <p>
+                本月已导入<span
+                    >{{ monthInsertSuccessCount + monthInsertErrorCount
+                    }}<el-button v-if="monthInsertSuccessCount" type="text" size="mini" @click="router2bill(`month`)"
+                        >(查看)</el-button
+                    ></span
+                >结算清单
+            </p>
+            <p>
+                本月导入（成功）<span>{{ monthInsertSuccessCount }}</span>
+                <el-button v-if="monthInsertSuccessCount" type="text" size="mini" @click="router2bill(`monthSuccess`)"
+                    >(查看)</el-button
+                >结算清单
+            </p>
+
+            <p>
+                本月导入（失败）<span>{{ monthInsertErrorCount }}</span>
+                <el-button v-if="monthInsertErrorCount" type="text" size="mini" @click="router2bill(`monthError`)"
+                    >(查看)</el-button
+                >结算清单
+            </p>
+            <p>
+                本月结算（成功）<span>{{ monthOutSuccess }}</span>
+                <el-button
+                    v-if="monthOutSuccess"
+                    :loading="outputLoading === 'monthOutSuccess'"
+                    type="text"
+                    size="mini"
+                    @click="handleAnalysisDownload('monthOutSuccess')"
+                    >(导出)</el-button
+                >结算清单
+            </p>
+            <p>
+                所有结算未找到受理用户<span>{{ notFoundUserCount }}</span>
+                <el-button
+                    v-if="notFoundUserCount"
+                    type="text"
+                    size="mini"
+                    :loading="outputLoading === 'notFoundUserCount'"
+                    @click="handleAnalysisDownload(`notFoundUserCount`)"
+                    >(导出)</el-button
+                >条
+            </p>
+
+            <div>
+                <el-button type="success" @click="handleUpdate" :loading="uploadloading">
+                    重新统计{{ uploadloading ? '中...' : '数据' }}
+                </el-button>
+                <el-button type="default" @click="onRouterList">查看结算清单</el-button>
+                <el-button type="default" @click="onRouterList('jf')">查看积分清单</el-button>
+
+                <!-- <el-button type="default" @click="handleClearData">删除所有数据(包括历史数据)</el-button> -->
+            </div>
         </div>
-        <!-- 受理清单 end-->
-
-        <!-- 结算清单 start-->
-        <div>
-            <div class="title-line">结算清单</div>
-
-            <el-table :data="jsLists" border style="width: 100%">
-                <el-table-column prop="date" label="账期" width="180"> </el-table-column>
-                <el-table-column prop="count" label="共有">
-                    <template slot-scope="scope">
-                        {{ (scope.row.success | 0) + (scope.row.fail | 0) }}
-                    </template>
-                </el-table-column>
-                <el-table-column prop="success" label="结算成功"> </el-table-column>
-                <el-table-column prop="fail" label="结算失败"> </el-table-column>
-                <el-table-column label="操作">
-                    <template slot-scope="scope">
-                        <el-button type="text" @click="onRouterList">查看</el-button>
-                    </template>
-                </el-table-column>
-            </el-table>
-        </div>
-        <!-- 结算清单 end-->
-
-        <!-- 积分清单 start-->
-
-        <div>
-            <div class="title-line">积分清单</div>
-
-            <el-table :data="jfLists" border style="width: 100%">
-                <el-table-column prop="date" label="账期" width="180"> </el-table-column>
-                <el-table-column prop="count" label="结算失败"> </el-table-column>
-                <el-table-column label="操作">
-                    <template slot-scope="scope">
-                        <el-button type="text" @click="onRouterList('jf')">查看</el-button>
-                    </template>
-                </el-table-column>
-            </el-table>
-        </div>
-        <!-- 积分清单 end-->
+        <!-- 账期分析 end-->
 
         <!-- 采集dialog start -->
         <div class="fetch-datas-box">
@@ -190,9 +213,6 @@ export default {
     name: 'bill',
     data() {
         return {
-            slLists: [], // 受理清单lists
-            jsLists: [],
-            jfLists: [],
             ss: {},
             ss2: [],
             ee: [],
@@ -349,194 +369,14 @@ export default {
             this.cookies = cookies
             this.isLogin = true
         }
+        this.onFetchPackageDatas()
 
         let data = JSON.parse(localStorage.getItem('localdata'))
         if (data) {
             this.fetchDatas = data
         }
-
-        // 获取结算清单数据
-        this.fetchJsLists()
-        this.fetchJfLists()
-        this.fetchSlLists()
     },
     methods: {
-        async downloadSlList(date) {
-            console.log(date)
-            // 下载受理清单
-            this.downSlListLoading = true
-
-            let sql = [
-                // 账期受理清单
-                `select zq.type as zq_type,zq.list_id, zq.state as zq_state,a.* from zhangqi zq left join accept a on zq.list_id=a.id where zq.date=${date}`,
-                // 结算清单
-                `select zq.type as zq_type, zq.state as zq_state,a.*,b.date as b_date,b.branch as b_branch,b.commission_money as b_money,b.order_id as b_order_id,b.user_number as b_user_member from zhangqi zq left join accept a on zq.list_id=a.id left join bill b on b.id = zq.qd_id where zq.date=${date} and zq.type=1`,
-                // 积分清单
-                `select zq.type as zq_type, zq.state as zq_state,a.*,j.* from zhangqi zq left join accept a on zq.list_id=a.id left join jifen j on j.id = zq.qd_id where zq.date=${date} and zq.type=2`
-            ]
-
-            // 账期受理清单
-            sql = sql.map(e => {
-                return new Promise(resolve => {
-                    this.$db.all(e, (err, res = []) => {
-                        resolve(res)
-                    })
-                })
-            })
-            console.log(sql)
-
-            Promise.all(sql).then(([all, js_list, jf_list]) => {
-                // 组装数据
-                console.log([all, js_list, jf_list])
-                all = this.formatAllDatas(all)
-                js_list = this.formatJsList(js_list)
-
-                // 下载
-                this.onDownload([all, ...js_list], `${date}受理清单结算信息`)
-            })
-        },
-        // 导出结算清单
-        formatJsList(js_list) {
-            let suss = [],
-                fail = [],
-                none = [],
-                all = []
-
-            let json = {
-                b_date: '账期',
-                b_user_member: '结算号码',
-                ...this.notfoundItems,
-                zq_state: '结算状态', //0:没有结算清单,1:结算成功, -1:结算失败
-                b_branch: '网点名称',
-                b_money: '佣金金额',
-                b_order_id: '结算清单ID'
-            }
-
-            js_list.forEach(e => {
-                e.date_end = dayjs.unix(e.date_end).format('YYYY-MM-DD')
-                e.created = dayjs.unix(e.created).format('YYYY-MM-DD')
-                // e.state = e.zq_state == -1 ? '结算失败' : e.zq_state == 1 ? '结算成功' : '没有结算信息'
-                if (e.zq_state == 1) {
-                    suss.push(e)
-                    e.zq_state = '结算成功'
-                } else if (e.zq_state == -1) {
-                    fail.push(e)
-                    e.zq_state = '结算失败'
-                } else {
-                    none.push(e)
-                    e.zq_state = '没有结算信息'
-                }
-                all.push(e)
-            })
-            all = this.parseAoaData(all, json)
-            suss = this.parseAoaData(suss, json)
-            fail = this.parseAoaData(fail, json)
-            none = this.parseAoaData(none, json)
-            return [
-                { datas: all, bookName: '全部结算清单' },
-                { datas: suss, bookName: '结算清单(成功)' },
-                { datas: fail, bookName: '结算清单(失败)' },
-                { datas: none, bookName: '结算清单(没有结算清单)' }
-            ]
-        },
-        formatAllDatas(all) {
-            // 账期 门店工号 门店名称 销售人员 用户ID 套餐名称 业务动作 业务号码 结算号码 揽收人
-            let json = {
-                ...this.notfoundItems,
-                user_number: '结算号码',
-                zq_type: '结算类型', // 1:结算清单 2.积分清单
-                zq_state: '结算状态' //0:没有结算清单,1:结算成功, -1:结算失败
-            }
-            all = all.map(e => {
-                e.zq_type = e.zq_type == 2 ? '积分结算' : '结算清单'
-                e.zq_state = e.zq_state == -1 ? '结算失败' : e.zq_state == 1 ? '结算成功' : '没有结算信息'
-                return e
-            })
-
-            let datas = this.parseAoaData(all, json)
-            return { datas, bookName: '受理清单' }
-        },
-        // 获取受理清单
-        fetchSlLists() {
-            // 账期  需结算 结算成功    结算失败    没有结算清单  积分清单    没有积分清单  操作
-
-            const max = dayjs().format('YYYYMM')
-            const min = dayjs()
-                .subtract(3, 'month')
-                .format('YYYYMM')
-            const sql = [0, 1, -1]
-                .map(e => {
-                    return [1, 2]
-                        .map(e2 => {
-                            return `select count(*) as count,date,state,type from zhangqi where date <= ${max} and date >= ${min} and state=${e} and type=${e2} group by date`
-                        })
-                        .join(' union all ')
-                })
-                .join(' union all ')
-
-            this.$db.all(sql, (err, res) => {
-                console.log('fetchSlLists', res)
-                const arr = {}
-                res.forEach(e => {
-                    if (!arr[e.date]) {
-                        arr[e.date] = { date: e.date, none: 0, fail: 0, success: 0, jf_success: 0, jf_fail: 0 }
-                    }
-
-                    if (e.type == 1) {
-                        let key = 'none'
-                        if (e.state == 1) {
-                            key = 'success'
-                        } else if (e.state == -1) {
-                            key = 'fail'
-                        }
-                        arr[e.date][key] = e.count | 0
-                    } else {
-                        if (e.state == 1) {
-                            arr[e.date].jf_success = e.count | 0
-                        } else {
-                            arr[e.date].jf_fail = e.count | 0
-                        }
-                    }
-                    const { success, none, fail, jf_success, jf_fail } = arr[e.date]
-                    arr[e.date].count = success + none + fail + jf_success + jf_fail
-                })
-                this.slLists = Object.values(arr)
-                console.log('fetchSlLists', arr)
-            })
-        },
-        // 获取积分清单
-        fetchJfLists() {
-            const max = dayjs().format('YYYYMM')
-            const min = dayjs()
-                .subtract(3, 'month')
-                .format('YYYYMM')
-            const sql = `select count(*) as count,date from jifen where date <= ${max} and date >= ${min} group by date`
-            this.$db.all(sql, (err, res) => {
-                if (res) {
-                    this.jfLists = res
-                }
-            })
-        },
-        // 获取结算清单的账单统计
-        fetchJsLists() {
-            const max = dayjs().format('YYYYMM')
-            const min = dayjs()
-                .subtract(3, 'month')
-                .format('YYYYMM')
-            const sql = `select count(status) as count,date,status from bill where date <= ${max} and date >= ${min} and status=1 group by date union all select count(status) as count,date,status from bill where date <= ${max} and date >= ${min} and status<>1 group by date`
-            this.$db.all(sql, (err, res) => {
-                if (res) {
-                    const arr = {}
-                    res.forEach(e => {
-                        if (!arr[e.date]) {
-                            arr[e.date] = { date: e.date }
-                        }
-                        arr[e.date][e.status ? 'success' : 'fail'] = e.count
-                    })
-                    this.jsLists = Object.values(arr)
-                }
-            })
-        },
         async uploadJifen() {
             // 上传积分
             let fileList = this.$electron.remote.dialog.showOpenDialog({

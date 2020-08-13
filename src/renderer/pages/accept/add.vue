@@ -1,5 +1,6 @@
 <template>
     <div id="home-add" v-loading.lock="loading" element-loading-text="正在解析数据">
+        <div @click="testParseDate">车市testParseDate</div>
         <div class="title-line shrink0">导入受理清单</div>
         <div style="margin-bottom: 20px">本月已导入{{ monthLength }}条数据</div>
         <div class="form-line">
@@ -46,9 +47,14 @@ import xlsx from 'xlsx'
 const fs = require('fs')
 const { readFileSync } = fs
 
+const customParseFormat = require('dayjs/plugin/customParseFormat')
+dayjs.extend(customParseFormat)
+
 export default {
     data() {
         return {
+            errorDate: [],
+            dateFormatArr: ['YYYY/M/D HH:mm:ss', 'YYYY-M-D HH:mm:ss'],
             monthLength: 0,
             insertStatus: false, //是否正在写入数据
             logsVisible: false, //显示解析记录
@@ -107,6 +113,18 @@ export default {
         this.onFetchMonthLength()
     },
     methods: {
+        testParseDate() {
+            let d1 = '2020/5/3 13:55:21'
+            let d2 = '2020/5/3 14:03:13'
+            let d3 = '2020/5/4 17:28:39'
+
+            var x = ['YYYY/M/D HH:mm:ss', 'YYYY-M-D HH:mm:ss']
+            d1 = dayjs(d1, this.dateFormatArr).unix()
+            d2 = dayjs(d2, x).format('YYYY-MM-DD HH:mm:ss')
+            d3 = dayjs(d3, x).format('YYYY-MM-DD HH:mm:ss')
+
+            console.log(d1, d2, d3)
+        },
         onFetchMonthLength() {
             const firstDay = dayjs()
                 .startOf('month')
@@ -234,35 +252,30 @@ export default {
             return new Promise(resolve => {
                 this.$db.run(sql, err => {
                     if (err) {
-                        this.$logger(err)
-                        // this.$logger()
-                        // 遇到相同的
-                        // 1. 查询出结果。
-                        // 2. 对照业务动作，新装的则保留新装
-                        // 3. 如果业务动作相同，保留受理日期小的。
-                        // const idx = values.findIndex(e => e === '业务号码')
                         const values = {}
                         keys.split(',').forEach((e, i) => {
                             values[e] = item[i]
                         })
-                        this.$logger({ values })
-                        // const action = item[idx]
-                        let ssql = `select * from accept where action_no = '${values.action_no}'`
+
+                        // 根据插入失败原因，判断是否更新数据
+                        let ssql = `select id,no,created from accept where action_no = '${values.action_no}' and product_name='${values.product_name}'`
                         this.$db.get(ssql, (err, res) => {
-                            this.$logger({ res, err })
+                            // this.$logger({ res, err })
                             if (res) {
+                                // 如果受理清单是新装则保留新装
+                                // 非新装取时间考前的
                                 if ((values.action == '新装' && res.no !== values.no) || values.created < res.created) {
-                                    let dsql = `delete from accept where action_no = '${values.action_no}'`
+                                    let dsql = `delete from accept where id = '${res.id}'`
                                     this.$db.run(dsql, (err, res) => {
                                         if (!err) {
                                             this.$db.run(sql, (err, res) => {
-                                                this.$logger('该插入成功', { err, res })
+                                                // this.$logger('该插入成功', { err, res })
                                             })
                                         }
-                                        this.$logger('删除数据', { err, res })
+                                        // this.$logger('删除数据', { err, res })
                                     })
                                 } else {
-                                    this.$logger('数据相同他')
+                                    // 不做处理
                                 }
                             }
                         })
@@ -272,6 +285,8 @@ export default {
             })
         },
         async handleInsertData(e) {
+            // return false
+
             if (this.insertStatus) return
             this.insertStatus = true
             // const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
@@ -281,13 +296,21 @@ export default {
             const values = Object.values(this.items)
 
             for (var i = this.datas.length - 1; i >= 0; i--) {
-                let item = this.datas[i]
-                item = values.map(e => {
-                    if (e == '受理时间' || e == '竣工时间') {
-                        let date = dayjs(item[e]).unix()
-                        // this.$logger(e, date)
+                let item = { ...this.datas[i] }
+                let restitem = values.map(e => {
+                    if (e === '竣工时间' || e == '受理时间') {
+                        let date = item[e]
+                        if (!date) {
+                            // const fromat_date = ['YYYY/M/D HH:mm:ss', 'YYYY-M-D HH:mm:ss']
+                            // date = dayjs(item['受理时间'], fromat_date).unix()
+                            date = item['受理时间']
+                        }
+                        // excel的时间格式是number
+                        if (typeof date === 'number') {
+                            date = new Date((date - 25569) * 86400 * 1000)
+                        }
 
-                        // let date = new Date(`${item[e]}`).getTime()
+                        date = dayjs(date).unix()
                         return isNaN(date) ? 0 : date
                     } else if (e == '导入时间') {
                         return now
@@ -299,10 +322,10 @@ export default {
                 // if (i == 1) {
                 // this.$logger(now)
 
-                let flag = await this.onEachInsert(key, item)
+                let flag = await this.onEachInsert(key, restitem)
 
                 let result = {}
-                item.forEach((e, i) => {
+                restitem.forEach((e, i) => {
                     result[values[i]] = e
                 })
                 // this.$logger(item.created, item.date_end, _d)
