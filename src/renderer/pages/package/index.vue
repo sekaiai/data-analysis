@@ -99,6 +99,7 @@ import dayjs from 'dayjs'
 const customParseFormat = require('dayjs/plugin/customParseFormat')
 
 dayjs.extend(customParseFormat)
+import { insertZhangqi } from '@/utils/zhangqi'
 
 export default {
     data() {
@@ -272,124 +273,12 @@ export default {
             return new Promise(reslove => {
                 const sql = `select * from accept where product_main = '${name}'`
                 this.$db.all(sql, (err, res = []) => {
-                    console.log('fetchAcceptLists', err, res)
+                    console.log('fetchAcceptLists', err, res, sql)
                     reslove(res)
                 })
             })
         },
 
-        // 通过套餐名称获取所有相关的结算你清单
-        fetchPgk2qingdan(pgk_name, table = 'bill') {
-            return new Promise(reslove => {
-                let sql =
-                    table === 'bill'
-                        ? `select user_number,id,date,status from ${table} where package_name='${pgk_name}'`
-                        : `select date,user_number,rw_name,id from ${table} where rw_name='${pgk_name}'`
-                this.$db.all(sql, (err, res = []) => {
-                    console.log('fetchPgk2qingdan', res, sql, err)
-                    reslove(res)
-                })
-            })
-        },
-        // 获取受理清单ID
-        fetchAcceptId(user_number, pgk_name) {
-            return new Promise(reslove => {
-                let sql = `select id from accept where (user_number = ${user_number} or action_no=${user_number}) and product_main='${pgk_name}'`
-                this.$db.get(sql, (err, res = {}) => {
-                    console.log('fetchAcceptId', res, sql)
-                    if (!res.id) {
-                        // 没有找到受理清单ID，从副卡中获取数据
-                        let sql = `select a1 from related_user where a2='${user_number}' or a3='${user_number}' or a4='${user_number}' or a5='${user_number}' or a6='${user_number}'`
-                        this.$db.get(sql, (err, res) => {
-                            if (res && res.a1) {
-                                // 更新受理清单副卡
-                                let sql = `update accept set user_number='${user_number}' where action_no='${res.a1}'`
-                                this.$db.run(sql, (err, res) => {
-                                    console.log('更新受理清单副卡', user_number)
-                                })
-                                return reslove(res.a1)
-                            }
-                            reslove(0)
-                        })
-                    } else {
-                        reslove(res.id)
-                    }
-                })
-            })
-        },
-        // 更新账期状态
-        // 如果出现相同的两个账期
-        // 根据套餐和受理清单获取所有账期
-        // 查找当前账期的状态，如果状态为1则往下状态非1的。
-        // 更新状态
-        updateZhangqiState({ accept_id, pgk_id, date, type, state, qd_id }) {
-            // 1. 先查找当前账期及以下的数据
-            let sql = ''
-            if (state === 1) {
-                sql = `select id from zhangqi where list_id=${accept_id} and pgk_id=${pgk_id} and date<=${date} and type=${type} and state<>1`
-
-                this.$db.get(sql, (err, res) => {
-                    console.log('updateZhangqiState', ...arguments, res)
-                    if (res && res.id) {
-                        let sql = `update zhangqi set state=${state},qd_id=${qd_id} where id=${res.id}`
-
-                        this.$db.run(sql, (err, res) => {
-                            console.log('update zhangqi', sql, err, res)
-                        })
-                    }
-                })
-            } else if (state === -1) {
-                // 直接获取当前账期状态，如果为1这不处理
-                sql = `select id,state from zhangqi where list_id=${accept_id} and pgk_id=${pgk_id} and date=${date} and type=${type}`
-                this.$db.get(sql, (err, res) => {
-                    if (res) {
-                        if (res.state == 0) {
-                            let sql = `update zhangqi set state=${state},qd_id=${qd_id} where id=${res.id}`
-                            this.$db.run(sql, (err, res) => {
-                                console.log(err, res)
-                            })
-                        }
-                    }
-                })
-            }
-        },
-        /**
-         * 计算账期是否结算
-         * 1. 通过相关参数获取账单ID
-         * 2. 通过套餐名和
-         * id(自增)    清单ID(list_id)   套餐ID(pgk_id)    账期(date)    是否已结算(state)    结算类型(type)
-         */
-        async computedZhangqiState(pgk_id, pgk_name) {
-            /*
-             * 1. 结算清单: 通过套餐名获取所有 用户号码（）， 结算清单ID(qd_id)
-             * 2. 受理清单：通过套餐名,用户号码 获取清单id(list_id)
-             */
-            let js_qingdan = await this.fetchPgk2qingdan(pgk_name, 'bill')
-            let jf_qingdan = await this.fetchPgk2qingdan(pgk_name, 'jifen')
-
-            console.log({ js_qingdan, jf_qingdan })
-
-            for (let i = 0; i < js_qingdan.length; i++) {
-                let { id: qd_id, date, user_number, status } = js_qingdan[i]
-                let accept_id = await this.fetchAcceptId(user_number, pgk_name)
-
-                let state = status | 0
-                if (state !== 1) {
-                    state = -1
-                    console.log('this.state -1', state)
-                }
-                let params = { accept_id, pgk_id, state, type: 1, date, qd_id }
-                this.updateZhangqiState(params)
-            }
-
-            for (let i = 0; i < jf_qingdan.length; i++) {
-                let { id: qd_id, date, user_number } = jf_qingdan[i]
-                let accept_id = await this.fetchAcceptId(user_number, pgk_name)
-
-                let params = { accept_id, pgk_id, state: 1, type: 1, date, qd_id }
-                this.updateZhangqiState(params)
-            }
-        },
         /*
          * 重写账期，以及更新账期state
          * 1. 先删除当前套餐关联的说有账期
@@ -402,77 +291,14 @@ export default {
 
             // 删除账期
             await this.deleteZhangqi(id)
+            let item = await this.fetchTaocanItem(id)
+            let accepts = await this.fetchAcceptLists(item.name)
 
-            // 获取他套餐信息
-            let { name, count_js, count_jf, law_jf, law_js } = await this.fetchTaocanItem(id)
-
-            // 2. 添加新账期。 2.1获取受理清单
-            let accepts = await this.fetchAcceptLists(name)
-
-            // 组装每月结算间隔
-            if (!count_js) {
-                law_js = []
-            } else {
-                law_js = law_js.toString().split(',')
-                law_js.length = count_js
-                law_js = Array.from(law_js, e => e | 0 || 1)
-            }
-
-            // 组装每月结算间隔
-            if (!count_jf) {
-                law_jf = []
-            } else {
-                law_jf = law_jf.toString().split(',')
-                law_jf.length = count_jf
-                law_jf = Array.from(law_jf, e => e | 0 || 1)
-            }
-
-            console.log({ law_jf, law_js, accepts })
-
-            let promiseArr = []
-            for (let i = 0; i < accepts.length; i++) {
-                let { date_end, id: accept_id } = accepts[i]
-                let date_jf = dayjs.unix(date_end).format('YYYYMM')
-                let date_js = date_jf
-                console.log('date begin', { date_end, date_js, date_jf })
-                // 创建结算(js)清单账期数据
-                for (let i = 0; i < law_js.length; i++) {
-                    date_js = dayjs(date_js, 'YYYYMM')
-                        .add(law_js[i], 'month')
-                        .format('YYYYMM')
-                    console.log({ date_js, law_js: law_js[i] })
-
-                    promiseArr.push(this.insertZhangqiItem(accept_id, id, date_js, 1))
-                }
-
-                // 创建结算积分(jf)账期数据
-                for (let i = 0; i < law_jf.length; i++) {
-                    date_jf = dayjs(date_jf, 'YYYYMM')
-                        .add(law_jf[i], 'month')
-                        .format('YYYYMM')
-                    console.log({ date_jf, law_jf: law_jf[i] })
-
-                    promiseArr.push(this.insertZhangqiItem(accept_id, id, date_jf, 2))
-                }
-            }
-
-            Promise.all(promiseArr).then(values => {
-                console.log('Promise all', values)
-                this.computedZhangqiState(id, name)
+            insertZhangqi(item, accepts).then(res => {
                 this.loading = false
             })
         },
-        insertZhangqiItem(accept_id, id, date_js, type) {
-            return new Promise(reslove => {
-                this.$db.run(
-                    `insert into zhangqi (list_id, pgk_id, date, type) values (${accept_id},${id},${date_js}, ${type})`,
-                    (err, res) => {
-                        console.log('zhangqi', err, res)
-                        reslove(res)
-                    }
-                )
-            })
-        },
+
         // 重置form内容
         resetForm(formName) {
             this.$refs[formName].resetFields()

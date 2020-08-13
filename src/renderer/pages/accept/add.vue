@@ -263,7 +263,7 @@ export default {
                             // this.$logger({ res, err })
                             if (res) {
                                 // 如果受理清单是新装则保留新装
-                                // 非新装取时间考前的
+                                // 非新装取时间靠前的
                                 if ((values.action == '新装' && res.no !== values.no) || values.created < res.created) {
                                     let dsql = `delete from accept where id = '${res.id}'`
                                     this.$db.run(dsql, (err, res) => {

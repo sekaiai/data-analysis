@@ -1,9 +1,12 @@
 <template>
     <div id="home" v-loading.lock="loading" :element-loading-text="`正在解析数据`">
         <!-- 受理清单 start-->
+        <div @click="fetchLastId('jifen')">fetchLastId</div>
+        <div @click="updateZhangqiJifenState('3521')">updateZhangqiJifenState</div>
 
         <div>
             <div class="title-line">受理清单</div>
+            <!-- 添加一个总结 -->
             <el-table :data="slLists" border style="width: 100%">
                 <el-table-column prop="date" label="账期" width="180"> </el-table-column>
                 <el-table-column prop="count" label="需结算"> </el-table-column>
@@ -186,6 +189,8 @@ const tough = require('tough-cookie')
 var Cookie = tough.Cookie
 const cheerio = require('cheerio')
 
+import { updateZhangqiJifenState } from '@/utils/zhangqi'
+
 export default {
     name: 'bill',
     data() {
@@ -273,8 +278,7 @@ export default {
                 status: '工单状态',
                 date_end: '竣工时间',
                 user: '揽收人',
-                remark: '备注',
-                import_date: '导入时间'
+                remark: '备注'
             },
             columns: {
                 date: '账期',
@@ -350,10 +354,10 @@ export default {
             this.isLogin = true
         }
 
-        let data = JSON.parse(localStorage.getItem('localdata'))
-        if (data) {
-            this.fetchDatas = data
-        }
+        // let data = JSON.parse(localStorage.getItem('localdata'))
+        // if (data) {
+        //     this.fetchDatas = data
+        // }
 
         // 获取结算清单数据
         this.fetchJsLists()
@@ -372,7 +376,7 @@ export default {
                 // 结算清单
                 `select zq.type as zq_type, zq.state as zq_state,a.*,b.date as b_date,b.branch as b_branch,b.commission_money as b_money,b.order_id as b_order_id,b.user_number as b_user_member from zhangqi zq left join accept a on zq.list_id=a.id left join bill b on b.id = zq.qd_id where zq.date=${date} and zq.type=1`,
                 // 积分清单
-                `select zq.type as zq_type, zq.state as zq_state,a.*,j.* from zhangqi zq left join accept a on zq.list_id=a.id left join jifen j on j.id = zq.qd_id where zq.date=${date} and zq.type=2`
+                `select zq.type as zq_type, zq.state as zq_state,zq.date as zq_date,a.*,j.* from zhangqi zq left join accept a on zq.list_id=a.id left join jifen j on j.id = zq.qd_id where zq.date=${date} and zq.type=2`
             ]
 
             // 账期受理清单
@@ -390,10 +394,47 @@ export default {
                 console.log([all, js_list, jf_list])
                 all = this.formatAllDatas(all)
                 js_list = this.formatJsList(js_list)
+                jf_list = this.formatJFList(jf_list)
 
                 // 下载
-                this.onDownload([all, ...js_list], `${date}受理清单结算信息`)
+                this.onDownload([all, ...js_list, ...jf_list], `${date}受理清单结算信息`)
             })
+        },
+        formatJFList(jf_list) {
+            let suss = [],
+                none = []
+
+            let json = {
+                b_user_member: '结算号码',
+                ...this.notfoundItems,
+                zq_state: '结算状态', //0:没有结算清单,1:结算成功, -1:结算失败
+                hyjh: '合约计划',
+                jf_jiesuan: '结算积分',
+                bqdh: '本期兑换',
+                qs: '清算',
+                ydjf: '应兑换积分',
+                zq_date: '账期'
+            }
+
+            jf_list.forEach(e => {
+                e.date_end = dayjs.unix(e.date_end).format('YYYY-MM-DD')
+                e.created = dayjs.unix(e.created).format('YYYY-MM-DD')
+
+                if (e.zq_state == 1) {
+                    e.zq_state = '已结算'
+                    suss.push(e)
+                } else {
+                    e.zq_state = '未结算'
+                    none.push(e)
+                }
+            })
+
+            suss = this.parseAoaData(suss, json)
+            none = this.parseAoaData(none, json)
+            return [
+                { datas: suss, bookName: '积分清单(成功)' },
+                { datas: none, bookName: '积分清单(没有结算清单)' }
+            ]
         },
         // 导出结算清单
         formatJsList(js_list) {
@@ -415,6 +456,8 @@ export default {
             js_list.forEach(e => {
                 e.date_end = dayjs.unix(e.date_end).format('YYYY-MM-DD')
                 e.created = dayjs.unix(e.created).format('YYYY-MM-DD')
+                // e.import_date = dayjs.unix(e.import_date).format('YYYY-MM-DD')
+
                 // e.state = e.zq_state == -1 ? '结算失败' : e.zq_state == 1 ? '结算成功' : '没有结算信息'
                 if (e.zq_state == 1) {
                     suss.push(e)
@@ -537,6 +580,15 @@ export default {
                 }
             })
         },
+        // 获取最后插入的ID
+        fetchLastId(table) {
+            return new Promise(resolve => {
+                let sql = `select id from ${table} order by id desc limit 1`
+                this.$db.get(sql, (err, res) => {
+                    resolve(res.id)
+                })
+            })
+        },
         async uploadJifen() {
             // 上传积分
             let fileList = this.$electron.remote.dialog.showOpenDialog({
@@ -561,6 +613,7 @@ export default {
 
             this.loadingJifen = false
         },
+
         async onOpenFile2(path, i) {
             // 获取数据
             const excelBuffer = fs.readFileSync(path)
@@ -578,7 +631,9 @@ export default {
             const _data = []
             const fun = []
             // let keys = Object.keys(this.jifenColumns).join(',')
+            // 先获取最大的积分清单的ID
 
+            const last_jf_id = await this.fetchLastId('jifen')
             result.SheetNames.forEach(key => {
                 let json = xlsx.utils.sheet_to_json(result.Sheets[key])
                 // console.log(json)
@@ -629,6 +684,8 @@ export default {
 
                 // 插入数据库
                 const sql = `replace into jifen (${keys}) values ('${values}')`
+                // let { id, name, count_js, count_jf, law_jf, law_js } = zq_item
+
                 this.$logger(sql)
                 this.$db.run(sql, err => {
                     if (err) {
@@ -637,6 +694,11 @@ export default {
                         // this.insertJFError.push(datas)
                     } else {
                         this.insertJifenCount++
+
+                        // 跟新账期状态
+                        //             console.log(datas)
+                        //             let params = { accept_id, pgk_id, state, type: 1, date, qd_id }
+                        // updateZhangqiState(params)
                     }
                     resolve(err)
                 })
@@ -1741,6 +1803,7 @@ export default {
 
             // this.result = result
             const now = dayjs().unix()
+            const last_js_id = await this.fetchLastId('jifen')
 
             // 分析数据
             const _data = []
@@ -1775,13 +1838,17 @@ export default {
                 }
             })
 
-            var promiseData = await Promise.all(fun)
+            Promise.all(fun).then(res => {
+                updateZhangqiJifenState(last_js_id)
+            })
 
             // 分析未找到数据
             this.datas = _data
             // 筛选数据
             this.handleParseLose()
         },
+        updateZhangqiJifenState,
+        // 插入结算清单
         onInsertDatas(datas, now) {
             return new Promise(resolve => {
                 datas.created = now
