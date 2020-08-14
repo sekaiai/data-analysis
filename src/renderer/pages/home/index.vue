@@ -584,7 +584,7 @@ export default {
             const min = dayjs()
                 .subtract(3, 'month')
                 .format('YYYYMM')
-            const sql = `select count(status) as count,date,status from bill where date <= ${max} and date >= ${min} and status=1 group by date union all select count(status) as count,date,status from bill where date <= ${max} and date >= ${min} and status<>1 group by date`
+            const sql = `select count(status) as count,date,status, sum(commission_money) as money from bill where date <= ${max} and date >= ${min} and status=1 group by date union all select count(status) as count,date,status from bill where date <= ${max} and date >= ${min} and status<>1 group by date`
             this.$db.all(sql, (err, res) => {
                 if (res) {
                     const arr = {}
