@@ -9,13 +9,25 @@
             <!-- 添加一个总结 -->
             <el-table :data="slLists" border style="width: 100%">
                 <el-table-column prop="date" label="账期" width="180"> </el-table-column>
-                <el-table-column prop="count" label="需结算"> </el-table-column>
+                <el-table-column prop="count" label="需结算">
+                    <template slot-scope="scope"> {{ scope.row.count }}条 </template>
+                </el-table-column>
                 <!-- success, none, fail, jf_success, jf_fail -->
-                <el-table-column prop="none" label="结算成功"> </el-table-column>
-                <el-table-column prop="success" label="结算失败"> </el-table-column>
-                <el-table-column prop="fail" label="未结算受理（结算清单）"> </el-table-column>
-                <el-table-column prop="jf_success" label="积分清单"> </el-table-column>
-                <el-table-column prop="jf_fail" label="未结算受理（积分）"> </el-table-column>
+                <el-table-column prop="none" label="结算成功">
+                    <template slot-scope="scope"> {{ scope.row.none }}条 </template>
+                </el-table-column>
+                <el-table-column prop="success" label="结算失败">
+                    <template slot-scope="scope"> {{ scope.row.success }}条 </template>
+                </el-table-column>
+                <el-table-column prop="fail" label="未结算受理（结算清单）">
+                    <template slot-scope="scope"> {{ scope.row.fail }}条 </template>
+                </el-table-column>
+                <el-table-column prop="jf_success" label="积分清单">
+                    <template slot-scope="scope"> {{ scope.row.jf_success }}条 </template>
+                </el-table-column>
+                <el-table-column prop="jf_fail" label="未结算受理（积分）">
+                    <template slot-scope="scope"> {{ scope.row.jf_fail }}条 </template>
+                </el-table-column>
 
                 <el-table-column label="操作">
                     <template slot-scope="scope">
@@ -33,12 +45,14 @@
             <el-table :data="jsLists" border style="width: 100%">
                 <el-table-column prop="date" label="账期" width="180"> </el-table-column>
                 <el-table-column prop="count" label="共有">
-                    <template slot-scope="scope">
-                        {{ (scope.row.success | 0) + (scope.row.fail | 0) }}
-                    </template>
+                    <template slot-scope="scope"> {{ (scope.row.success | 0) + (scope.row.fail | 0) }}条 </template>
                 </el-table-column>
-                <el-table-column prop="success" label="结算成功"> </el-table-column>
-                <el-table-column prop="fail" label="结算失败"> </el-table-column>
+                <el-table-column prop="success" label="结算成功">
+                    <template slot-scope="scope"> {{ scope.row.success }}条 </template>
+                </el-table-column>
+                <el-table-column prop="fail" label="结算失败">
+                    <template slot-scope="scope"> {{ scope.row.fail }}条 </template>
+                </el-table-column>
                 <el-table-column label="操作">
                     <template slot-scope="scope">
                         <el-button type="text" @click="onRouterList">查看</el-button>
@@ -55,7 +69,11 @@
 
             <el-table :data="jfLists" border style="width: 100%">
                 <el-table-column prop="date" label="账期" width="180"> </el-table-column>
-                <el-table-column prop="count" label="结算失败"> </el-table-column>
+                <el-table-column prop="count" label="结算">
+                    <template slot-scope="scope"> {{ scope.row.count }}条 </template>
+                </el-table-column>
+                <el-table-column prop="ydjf" label="总积分"> </el-table-column>
+                <el-table-column prop="qs" label="清算积分"> </el-table-column>
                 <el-table-column label="操作">
                     <template slot-scope="scope">
                         <el-button type="text" @click="onRouterList('jf')">查看</el-button>
@@ -314,7 +332,7 @@ export default {
                 user_id: '用户ID',
                 user_number: '用户号码',
                 xs_instance_id: '销售品实例ID',
-                rw_name: '入网套餐',
+                package_name: '入网套餐',
                 rw_date: '入网时间',
                 hyjh: '合约计划',
                 jf_jiesuan: '结算积分',
@@ -553,7 +571,7 @@ export default {
             const min = dayjs()
                 .subtract(3, 'month')
                 .format('YYYYMM')
-            const sql = `select count(*) as count,date from jifen where date <= ${max} and date >= ${min} group by date`
+            const sql = `select count(*) as count,date,sum(ydjf) as ydjf,sum(qs) as qs from jifen where date <= ${max} and date >= ${min} group by date`
             this.$db.all(sql, (err, res) => {
                 if (res) {
                     this.jfLists = res
@@ -585,7 +603,8 @@ export default {
             return new Promise(resolve => {
                 let sql = `select id from ${table} order by id desc limit 1`
                 this.$db.get(sql, (err, res) => {
-                    resolve(res.id)
+                    let id = (res && res.id) | 0
+                    resolve(id)
                 })
             })
         },
@@ -610,8 +629,6 @@ export default {
             for (var i = 0; i < fileList.length; i++) {
                 await this.onOpenFile2(fileList[i], i)
             }
-
-            this.loadingJifen = false
         },
 
         async onOpenFile2(path, i) {
@@ -662,18 +679,17 @@ export default {
                     fun.push(this.insertJifen(obj))
                     return obj
                 })
-
-                // 插入数据库
-                if (key === '成功' || key === '失败') {
-                    _data.push(...json)
-                }
             })
 
-            var promiseData = await Promise.all(fun)
-            this.$logger('Promise', promiseData)
+            Promise.all(fun).then(async res => {
+                await updateZhangqiJifenState(last_jf_id, 'jifen')
+                this.fetchJfLists()
+                this.fetchSlLists()
+                this.loadingJifen = false
+            })
 
-            this.datas = _data
-            this.handleParseLose()
+            // this.datas = _data
+            // this.handleParseLose()
         },
         insertJifen(datas) {
             return new Promise(resolve => {
@@ -683,7 +699,7 @@ export default {
                 console.log(keys, values)
 
                 // 插入数据库
-                const sql = `replace into jifen (${keys}) values ('${values}')`
+                const sql = `insert into jifen (${keys}) values ('${values}')`
                 // let { id, name, count_js, count_jf, law_jf, law_js } = zq_item
 
                 this.$logger(sql)
@@ -1260,7 +1276,7 @@ export default {
         async onUpdate() {
             this.uploadloading = true
             // 更新所有数据
-            const sql = `select user_number,count(user_number) as count,package_name from bill group by user_number,package_name union all select user_number,count(user_number) as count,rw_name as package_name from jifen group by user_number,package_name`
+            const sql = `select user_number,count(user_number) as count,package_name from bill group by user_number,package_name union all select user_number,count(user_number) as count,package_name as package_name from jifen group by user_number,package_name`
 
             const bills = await new Promise(resolve => {
                 this.$db.all(sql, (err, res = []) => {
@@ -1512,7 +1528,7 @@ export default {
                         // this.$logger('找出结算成功的数据 __count', __count)
                         if (__count.length) {
                             // 找出结算成功的数据
-                            let sql = `select date from bill where user_number='${e.action_no}' and status=1 and package_name='${e.package_name}' union all select date from jifen where user_number='${e.action_no}' and rw_name='${e.package_name}'`
+                            let sql = `select date from bill where user_number='${e.action_no}' and status=1 and package_name='${e.package_name}' union all select date from jifen where user_number='${e.action_no}' and package_name='${e.package_name}'`
 
                             const qd = await new Promise(resolve => {
                                 this.$db.all(sql, (err, res) => {
@@ -1840,12 +1856,15 @@ export default {
 
             Promise.all(fun).then(res => {
                 updateZhangqiJifenState(last_js_id)
+                this.fetchJSLists()
+                this.fetchSlLists()
+                this.loadingJifen = false
             })
 
             // 分析未找到数据
-            this.datas = _data
+            // this.datas = _data
             // 筛选数据
-            this.handleParseLose()
+            // this.handleParseLose()
         },
         updateZhangqiJifenState,
         // 插入结算清单
@@ -1864,7 +1883,7 @@ export default {
                         this.insertError.push(datas)
                     } else {
                         this.insertSuccessCount++
-
+                        /*
                         // 更新acceptjs_count
                         const id = datas.user_number
                         const sql = `update accept set js_count=js_count+1 where action_no='${id}' or user_number='${id}'`
@@ -1892,7 +1911,7 @@ export default {
                                     }
                                 })
                             }
-                        })
+                        })*/
                     }
                     resolve(err)
                 })

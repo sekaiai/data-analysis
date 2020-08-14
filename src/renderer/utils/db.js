@@ -269,7 +269,7 @@ a6 varchar(200)
         user_id varchar(200),
         user_number varchar(200),
         xs_instance_id varchar(200),
-        rw_name varchar(200),
+        package_name varchar(200),
         rw_date varchar(200),
         hyjh varchar(200),
         jf_jiesuan varchar(200),

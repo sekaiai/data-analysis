@@ -133,6 +133,7 @@
 <script>
 import dayjs from 'dayjs'
 import download from '@/utils/download.js'
+import { deleteZhangqi2Qingdan } from '@/utils/zhangqi.js'
 export default {
     name: 'blist',
     data() {
@@ -200,14 +201,25 @@ export default {
             })
                 .then(() => {
                     let where = this.onParseSearchSQL()
-                    let sql = `delete from bill where  ${where}`
+                    // 先查询出所有需要删除的ID
+                    let delSql = `select id from bill b where ${where}`
+                    this.$db.all(delSql, (err, res) => {
+                        if (res.length) {
+                            let ids = res.map(e => e.id)
+                            console.log(delSql, ids)
 
-                    this.$db.run(sql, (err, res) => {
-                        console.log(err, res)
-                        if (!err) {
-                            this.$message({
-                                message: '数据已删除',
-                                type: 'success'
+                            let sql = `delete from bill where id in (${ids.join(',')})`
+
+                            this.$db.run(sql, (err, res) => {
+                                console.log(err, res, sql)
+                                if (!err) {
+                                    this.$message({
+                                        message: '数据已删除',
+                                        type: 'success'
+                                    })
+                                    deleteZhangqi2Qingdan(ids, 'bill')
+                                    this.onFetchDatas()
+                                }
                             })
                         }
                     })

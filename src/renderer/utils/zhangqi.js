@@ -40,22 +40,117 @@ const computedZhangqiState = async (pgk_id, pgk_name) => {
 
     return Promise.all(promiseArr)
 }
-const updateZhangqiJifenState = last_id => {
+
+const deleteZhangqi2Qingdan = (ids, type) => {
+    type = type === 'bill' ? 1 : 2
+    let sql = `delete from zhangqi where type=${type} and qd_id in (${ids.join(',')})`
+
+    DB.run(sql, (err, res) => {
+        console.log('deleteZhangqi2Qingdan', err, res, sql)
+    })
+}
+
+const updateZhangqiJifenState = async (last_id, type = 'bill') => {
     // 1. 先获取套餐id。
     // 2. 获取用户号码，如果没有号码的需要绑定到受理清单
-    let sql = `select j.id as j_id, j.rw_name,j.date,j.user_number as j_user_name, a.user_number as a_user_name,pkg.id as p_id
+    /*
+    const accept_id = await fetchAcceptId(user_number, pgk_name)
+
+    let sql = `select j.id as j_id, j.package_name,j.date,j.user_number as j_user_name, a.user_number as a_user_name,p.id as p_id
     from jifen j 
-    inner jion accept a on (j.user_number=a.user_number or j.user_number=a.action_no) 
-    inner join pgk p on p.name=j.rw_name where j.id > ${last_id}`
+    left join accept a on j.package_name=a.product_name and (j.user_number=a.user_number or j.user_number=a.action_no) 
+    left join pgk p on p.name=j.package_name where j.id > ${last_id}`
 
     DB.all(sql, (err, res) => {
         console.log('updateZhangqiJifenState', err, res)
+    })*/
+
+    // 1. 查询出相关的数据包括 id, a_id: 受理清单ID,p_id: 套餐ID,user_number
+    // 1.1 如果没有a_id获取,就从副卡查找ID
+    let sql = ''
+
+    if (type === 'bill') {
+        sql = `select b.id,b.package_name,b.user_number,a.id as a_id,p.id as p_id,b.date,b.status
+                    from ${type} b
+                    left join accept a on (a.action_no=b.user_number or b.user_number=a.action_no)
+                    left join pgk p on p.name=b.package_name
+                    where p.id is not null and b.id > ${last_id}`
+    } else {
+        sql = `select b.id,b.package_name,b.user_number,a.id as a_id,p.id as p_id,b.date
+                                from ${type} b
+                                left join accept a on (a.action_no=b.user_number or b.user_number=a.action_no)
+                                left join pgk p on p.name=b.package_name
+                                where p.id is not null and b.id > ${last_id}`
+    }
+
+    DB.all(sql, async (err, res = []) => {
+        console.log(res, sql)
+        if (!res || !res.length) {
+            return
+        }
+
+        // 1. 查找没有受理ID的数据, 然后更新副卡
+        // 如果没有副卡信息，就删除 该 清单
+        for (var i = 0; i < res.length; i++) {
+            let v = res[i]
+            if (!v.a_id) {
+                const { id = 0 } = await fetchAcceptId2Re(v.user_number, v.package_name)
+                v.a_id = id
+            }
+
+            let params = {
+                accept_id: v.a_id,
+                pgk_id: v.p_id,
+                date: v.date,
+                type: 1,
+                state: type === 'bill' ? (v.status | 0 ? 1 : -1) : 1,
+                qd_id: v.id
+            }
+            updateZhangqiState(params)
+        }
+        /*
+        let notAcceptId = []
+        res.forEach(e => {
+            if (!e.a_id) {
+                notAcceptId.push(fetchAcceptId2Re(e.user_number, e.package_name))
+            }
+        })
+        if (notAcceptId.length) {
+            notAcceptId = await Promise.all(notAcceptId)
+
+            notAcceptId.forEach(e => {
+                    let idx = res.findIndex(re => re.user_number === e.from)
+                if (e.id) {
+                    res[idx].a_id = e.id
+                }else{
+                    res.splice(idx,1)
+                }
+            })
+        }
+
+        // 开始更新信息
+        updateZhangqiState()
+*/
+        // console.log({ notAcceptId })
     })
 
+    /*    select  j.id,p.id as p_id,zq.id as z_id,j.user_number as j_user_number, a.id as a_id, a.user_number as a_user_number
+        from jifen j 
+        left join accept a on j.package_name=a.product_name and (j.user_number=a.user_number or j.user_number=a.action_no) 
+        left join pgk p on p.name=j.package_name
+        left join zhangqi zq on zq.list_id=a.id and zq.qd_id=j.id and zq.pgk_id=p.id
+        where j.id > 3000*/
+    /*
+select  j.id,p.id as p_id,j.user_number as j_user_number, a.id as a_id, a.user_number as a_user_number, a.action_no, j.package_name, a.product_main
+    from bill j 
+    left join accept a on (j.user_number=a.user_number or j.user_number=a.action_no) 
+    left join pgk p on p.name=j.package_name
+    where j.id > 26000
+    */
     // `update zhangqi set state=1,qd_id=${id} where date=${date} and `
 
-    // let accept_id = await fetchAcceptId(user_number, rw_name)
-    // let pgk_id = await fetchTaocanId(rw_name)
+    // let accept_id = await fetchAcceptId(user_number, package_name)
+    // let pgk_id = await fetchTaocanId(package_name)
     // if(accept_id && pgk_id){
 
     // }
@@ -79,7 +174,7 @@ const fetchPgk2qingdan = (pgk_name, table = 'bill') => {
         let sql =
             table === 'bill'
                 ? `select user_number,id,date,status from ${table} where package_name='${pgk_name}'`
-                : `select date,user_number,rw_name,id from ${table} where rw_name='${pgk_name}'`
+                : `select date,user_number,package_name,id from ${table} where package_name='${pgk_name}'`
         DB.all(sql, (err, res = []) => {
             console.log('fetchPgk2qingdan', res, sql, err)
             reslove(res)
@@ -95,20 +190,37 @@ const fetchAcceptId = (user_number, pgk_name) => {
             console.log('fetchAcceptId', res, sql)
             if (!res.id) {
                 // 没有找到受理清单ID，从副卡中获取数据
-                let sql = `select a1 from related_user where a2='${user_number}' or a3='${user_number}' or a4='${user_number}' or a5='${user_number}' or a6='${user_number}'`
-                DB.get(sql, (err, res) => {
-                    if (res && res.a1) {
-                        // 更新受理清单副卡
-                        let sql = `update accept set user_number='${user_number}' where action_no='${res.a1}'`
-                        DB.run(sql, (err, res) => {
-                            console.log('更新受理清单副卡', user_number)
-                        })
-                        return reslove(res.a1)
-                    }
-                    reslove(0)
+                fetchAcceptId2Re({ user_number, pgk_name }).then(res2 => {
+                    reslove(res2.id)
                 })
             } else {
                 reslove(res.id)
+            }
+        })
+    })
+}
+// return {id: accetp_id, to: 结果， from: user_member}
+const fetchAcceptId2Re = ({ user_number, pgk_name }) => {
+    return new Promise(reslove => {
+        let sql = `select a1 from related_user where a2='${user_number}' or a3='${user_number}' or a4='${user_number}' or a5='${user_number}' or a6='${user_number}'`
+        DB.get(sql, (err, res) => {
+            if (res && res.a1) {
+                // 更新受理清单副卡
+                let action_no = res.a1
+                let sql = `select id from accept where (user_number = ${user_number} or action_no=${action_no}) and product_main='${pgk_name}'`
+
+                DB.get(sql, (err, res) => {
+                    if (res && res.id) {
+                        let sql = `update accept set user_number='${user_number}' where id=${res.id}`
+                        DB.run(sql, (err, res) => {
+                            console.log('更新受理清单副卡', user_number)
+                        })
+                        return reslove({ id: res.id, from: user_number, to: action_no })
+                    }
+                    reslove({ id: 0, to: 0 })
+                })
+            } else {
+                reslove({ id: 0, to: 0 })
             }
         })
     })
@@ -234,4 +346,4 @@ const insertZhangqiItem = (accept_id, id, date, type) => {
     })
 }
 
-export { insertZhangqi, updateZhangqiJifenState }
+export { insertZhangqi, updateZhangqiJifenState, deleteZhangqi2Qingdan }

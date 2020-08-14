@@ -164,6 +164,7 @@
 <script>
 import dayjs from 'dayjs'
 import download from '@/utils/download.js'
+import { deleteZhangqi2Qingdan } from '@/utils/zhangqi.js'
 export default {
     name: 'blist',
     data() {
@@ -186,7 +187,7 @@ export default {
                 date: '账期',
                 xs_instance_id: '销售实例ID',
                 user_number: '用户号码',
-                rw_name: '入网套餐',
+                package_name: '入网套餐',
                 md_name: '门店名称',
                 acceptor: '受理人',
                 user: '揽收人',
@@ -213,7 +214,28 @@ export default {
             })
                 .then(() => {
                     let where = this.onParseSearchSQL()
-                    let sql = `delete from jifen where  ${where}`
+
+                    let delSql = `select id from jifen b where ${where}`
+                    this.$db.all(delSql, (err, res) => {
+                        if (res.length) {
+                            let ids = res.map(e => e.id)
+                            console.log(delSql, ids)
+                            let sql = `delete from jifen where id in (${ids.join(',')})`
+
+                            this.$db.run(sql, (err, res) => {
+                                if (!err) {
+                                    this.$message({
+                                        message: '数据已删除',
+                                        type: 'success'
+                                    })
+                                }
+                                deleteZhangqi2Qingdan(ids, 'jifen')
+                                this.onFetchDatas()
+                            })
+                        }
+                    })
+
+                    /*let sql = `delete from jifen where  ${where}`
 
                     this.$db.run(sql, (err, res) => {
                         console.log(err, res)
@@ -224,7 +246,7 @@ export default {
                             })
                         }
                         this.datas = []
-                    })
+                    })*/
                 })
                 .catch(err => {
                     console.log(err)
@@ -254,7 +276,7 @@ export default {
                         user_id: '用户ID',
                         user_number: '用户号码',
                         xs_instance_id: '销售品实例ID',
-                        rw_name: '入网套餐',
+                        package_name: '入网套餐',
                         rw_date: '入网时间',
                         hyjh: '合约计划',
                         jf_jiesuan: '结算积分',
