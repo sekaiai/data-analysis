@@ -5,7 +5,7 @@
                 刷新数据
             </el-button>
         </div>
-        <div class="tags-box">
+        <div class="tags-box" v-if="product_mains.length">
             <el-tag v-for="(item, i) in product_mains" :key="i" type="info" effect="plain" size="medium">
                 {{ item }}
                 <span @click="openAddTaocan(item)" class="span">添加</span>
@@ -99,7 +99,7 @@ import dayjs from 'dayjs'
 const customParseFormat = require('dayjs/plugin/customParseFormat')
 
 dayjs.extend(customParseFormat)
-import { insertZhangqi } from '@/utils/zhangqi'
+import { insertZhangqi, updateZhangqi, deleteZhangqi } from '@/utils/zhangqi'
 
 export default {
     data() {
@@ -233,7 +233,6 @@ export default {
             }
             this.loading = true
             this.$db.run(sql, (err, res) => {
-                console.log('---------------', err, res)
                 if (err) {
                     this.loading = false
 
@@ -244,11 +243,14 @@ export default {
                 } else {
                     if (!this.isedit) {
                         this.$db.get(`select last_insert_rowid() as id from pgk`, (err, res) => {
-                            console.log(err, res)
-                            this.updateZhangqi(res.id)
+                            updateZhangqi(res.id).then(res => {
+                                this.loading = false
+                            })
                         })
                     } else {
-                        this.updateZhangqi(this.isedit)
+                        updateZhangqi(this.isedit).then(res => {
+                            this.loading = false
+                        })
                     }
 
                     this.isShowAddTaocan = false
@@ -259,25 +261,6 @@ export default {
                 this.$logger(err)
             })
         },
-        // 获取单个套餐内容
-        fetchTaocanItem(id) {
-            return new Promise(reslove => {
-                this.$db.get(`select * from pgk where id=${id}`, (err, res = {}) => {
-                    reslove(res)
-                })
-            })
-        },
-
-        // 获取受理清单列表， name = 套餐名称
-        fetchAcceptLists(name) {
-            return new Promise(reslove => {
-                const sql = `select * from accept where product_main = '${name}'`
-                this.$db.all(sql, (err, res = []) => {
-                    console.log('fetchAcceptLists', err, res, sql)
-                    reslove(res)
-                })
-            })
-        },
 
         /*
          * 重写账期，以及更新账期state
@@ -286,36 +269,26 @@ export default {
          * 3. 根据结算清单和积分清单 重新统计账期
          * id => 套餐id
          */
-        async updateZhangqi(id) {
+        updateZhangqi(id) {
+            console.log('updateZhangqi')
             // todo: 计算 结算清单和积分清单
 
-            // 删除账期
-            await this.deleteZhangqi(id)
-            let item = await this.fetchTaocanItem(id)
-            let accepts = await this.fetchAcceptLists(item.name)
-
-            insertZhangqi(item, accepts).then(res => {
+            // updateZhangqi(id).then(res => {
+            //     console.log('fakdjflkadf',res)
+            // })
+            const x = updateZhangqi(id).then(res => {
                 this.loading = false
             })
+            console.log('xxxxxxxxxxxxxxxxx', x)
         },
 
         // 重置form内容
         resetForm(formName) {
             this.$refs[formName].resetFields()
         },
-        /**
-         * 删除账期
-         * id int 套餐ID
-         */
-        deleteZhangqi(id) {
-            const sql = `delete from zhangqi where pgk_id='${id}'`
-            this.$db.run(sql, (err, res) => {
-                console.log('deleteZhangqi', err, res)
-            })
-        },
+
         // 删除套餐，id: 套餐ID
         deleteTaocan(id) {
-            console.log({ id })
             this.$confirm('确定要删除该套餐吗？', '提示', {
                 confirmButtonText: '确定',
                 cancelButtonText: '取消',
@@ -325,16 +298,18 @@ export default {
                     // const { id } = this.datas[index]
                     const sql = `delete from pgk where id = ${id}`
                     this.$db.run(sql, (err, res) => {
+                        console.log(err, res)
+
                         this.$message({
                             type: err ? 'error' : 'success',
-                            message: err ? '删除失败' : '删除成功!'
+                            message: err ? '删除失败：' + err.message : '删除成功!'
                         })
                         if (!err) {
                             // 清楚该数据
                             // this.datas.splice(index, 1)
                             this.fetchDatas()
                             // 删除相关账期数据
-                            this.deleteZhangqi(id)
+                            deleteZhangqi(id)
                         }
                     })
                 })

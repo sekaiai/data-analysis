@@ -80,7 +80,6 @@ export default {
       this.onFetchData()
     },
     onFetchData() {
-      console.log('keyup')
       let star = (this.page - 1) * this.limit
       let limit = ` limit ${star},${this.limit}`
       let sql = `select * from related_user`

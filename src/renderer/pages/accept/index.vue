@@ -474,7 +474,6 @@ export default {
                             })
                         })
                         .catch(err => {
-                            console.log('error', err)
                             this.outputLoading = false
 
                             this.$message({

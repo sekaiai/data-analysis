@@ -114,10 +114,6 @@
                                 <el-form-item label="县公司">
                                     <span>{{ props.row.company }}</span>
                                 </el-form-item>
-
-                                <el-form-item label="销售人员">
-                                    <span>{{ props.row.xs_name }}</span>
-                                </el-form-item>
                                 <el-form-item label="销售人员工号">
                                     <span>{{ props.row.xs_id }}</span>
                                 </el-form-item>
@@ -163,10 +159,13 @@
 </template>
 <script>
 import dayjs from 'dayjs'
+const customParseFormat = require('dayjs/plugin/customParseFormat')
+dayjs.extend(customParseFormat)
+
 import download from '@/utils/download.js'
 import { deleteZhangqi2Qingdan } from '@/utils/zhangqi.js'
 export default {
-    name: 'blist',
+    name: 'jlist',
     data() {
         return {
             outputLoading: false, //导出中
@@ -189,9 +188,9 @@ export default {
                 user_number: '用户号码',
                 package_name: '入网套餐',
                 md_name: '门店名称',
-                acceptor: '受理人',
-                user: '揽收人',
-                acno: '是否有受理清单'
+                xs_name: '销售人员',
+                jf_jiesuan: '结算积分'
+                // acno: '是否有受理清单'
             }
         }
     },
@@ -201,6 +200,11 @@ export default {
         }
     },
     created() {
+        const { created = '', status = '', date = '' } = this.$route.query
+
+        this.created = created
+        this.status = status
+        this.date = date && date !== 'undefined' ? dayjs(date) : ''
         this.onFetchDatas()
         this.onFetchDatasCount()
     },
@@ -219,7 +223,6 @@ export default {
                     this.$db.all(delSql, (err, res) => {
                         if (res.length) {
                             let ids = res.map(e => e.id)
-                            console.log(delSql, ids)
                             let sql = `delete from jifen where id in (${ids.join(',')})`
 
                             this.$db.run(sql, (err, res) => {
@@ -238,7 +241,6 @@ export default {
                     /*let sql = `delete from jifen where  ${where}`
 
                     this.$db.run(sql, (err, res) => {
-                        console.log(err, res)
                         if (!err) {
                             this.$message({
                                 message: '数据已删除',

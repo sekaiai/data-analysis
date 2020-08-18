@@ -20,12 +20,12 @@
                     <el-option :label="v.v" :value="v.i" v-for="(v, i) in status_arr" :key="i"></el-option>
                 </el-select>
             </div>
-            <div class="flex-item">
+            <!--         <div class="flex-item">
                 <div class="title">其他</div>
                 <el-select v-model="not_found_user" placeholder="其他" filterable>
                     <el-option label="未找到业务ID" value="1"></el-option>
                 </el-select>
-            </div>
+            </div> -->
             <div class="flex-item">
                 <div class="title">业务号码</div>
                 <el-input v-model="user_number" placeholder="可输入部分" />
@@ -180,14 +180,11 @@ export default {
         }
     },
     created() {
-        const { created, status } = this.$route.query
-        this.$logger('xxxxxxxx', this.$route)
-        if (created) {
-            this.created = created
-        }
-        if (status !== undefined) {
-            this.status = status
-        }
+        const { created = '', status = '', date = '' } = this.$route.query
+        this.created = created
+        this.status = status
+        console.log(this.$route.query)
+        this.date = date && date !== 'undefined' ? dayjs(date) : ''
         this.onFetchDatas()
         this.onFetchDatasCount()
     },
@@ -206,12 +203,10 @@ export default {
                     this.$db.all(delSql, (err, res) => {
                         if (res.length) {
                             let ids = res.map(e => e.id)
-                            console.log(delSql, ids)
 
                             let sql = `delete from bill where id in (${ids.join(',')})`
 
                             this.$db.run(sql, (err, res) => {
-                                console.log(err, res, sql)
                                 if (!err) {
                                     this.$message({
                                         message: '数据已删除',

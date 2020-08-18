@@ -50,6 +50,8 @@ const { readFileSync } = fs
 const customParseFormat = require('dayjs/plugin/customParseFormat')
 dayjs.extend(customParseFormat)
 
+import { SLinsertZhangqi } from '@/utils/zhangqi'
+
 export default {
     data() {
         return {
@@ -122,8 +124,6 @@ export default {
             d1 = dayjs(d1, this.dateFormatArr).unix()
             d2 = dayjs(d2, x).format('YYYY-MM-DD HH:mm:ss')
             d3 = dayjs(d3, x).format('YYYY-MM-DD HH:mm:ss')
-
-            console.log(d1, d2, d3)
         },
         onFetchMonthLength() {
             const firstDay = dayjs()
@@ -295,6 +295,18 @@ export default {
             const key = Object.keys(this.items).join(',')
             const values = Object.values(this.items)
 
+            /**
+            更新账期
+            1. 查询出最大ID
+            2. 
+            **/
+            let max_id = await new Promise(resolve => {
+                this.$db.get(`select id from accept order by id desc limit 1`, (err, res) => {
+                    let id = (res && res.id) | 0
+                    resolve(id)
+                })
+            })
+
             for (var i = this.datas.length - 1; i >= 0; i--) {
                 let item = { ...this.datas[i] }
                 let restitem = values.map(e => {
@@ -345,6 +357,7 @@ export default {
             }
             this.onFetchMonthLength()
             this.insertStatus = false
+            SLinsertZhangqi(max_id)
         }
     }
 }

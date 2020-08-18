@@ -19,11 +19,14 @@
             </el-menu-item>
         </el-menu>
         <!-- <el-scrollbar class='main'> -->
-        <div class="continer flex1 flex">
-            <keep-alive exclude="blist">
-                <router-view class="main flex1 flex-column flex"></router-view>
-            </keep-alive>
-        </div>
+        <!-- <div > -->
+        <el-scrollbar noresize class="continer flex1">
+            <!-- <keep-alive exclude="bill,blist,jlist"> -->
+            <router-view class="main flex1 flex-column flex"></router-view>
+            <!-- </keep-alive> -->
+        </el-scrollbar>
+
+        <!-- </div> -->
         <!-- </el-scrollbar> -->
     </div>
 </template>
@@ -46,13 +49,21 @@ body {
     width: 100%;
 
     .main {
-        padding: 10px 0 10px 20px;
+        padding: 10px 20px 10px 20px;
     }
 
     .continer {
-        max-width: calc(100vw - 104px);
+        // max-width: calc(100vw - 104px);
+        height: 100%;
     }
-
+    .continer > .el-scrollbar__wrap {
+        overflow-x: auto;
+        .el-scrollbar__view {
+            .main {
+                min-height: 100vh;
+            }
+        }
+    }
     .menu-vertical {
         flex-shrink: 0;
         position: sticky;
@@ -60,11 +71,11 @@ body {
         z-index: 999;
     }
 
-    .el-scrollbar__view {
-        padding: 10px;
-        height: 100vh;
-        box-sizing: border-box;
-    }
+    // .el-scrollbar__view {
+    //     padding: 10px;
+    //     height: 100vh;
+    //     box-sizing: border-box;
+    // }
 
     font-size: 14px;
 }
