@@ -17,43 +17,79 @@
             <!-- 添加一个总结 -->
             <el-table :data="slLists" border style="width: 100%;" max-height="280">
                 <el-table-column prop="date" label="账期"> </el-table-column>
-                <el-table-column prop="count" label="需结算">
-                    <template slot-scope="scope"> {{ scope.row.count ? scope.row.count + '条' : '-' }}</template>
-                </el-table-column>
-                <!-- success, none, fail, jf_success, jf_fail -->
-                <el-table-column prop="success" label="已结算">
-                    <template slot-scope="scope"> {{ scope.row.success ? scope.row.success + '条' : '-' }}</template>
+
+                <el-table-column label="总计">
+                    <el-table-column label="总清单" width="80">
+                        <template slot-scope="scope"> {{ scope.row.count ? scope.row.count + '条' : '-' }}</template>
+                    </el-table-column>
+                    <el-table-column label="结算成功" width="80">
+                        <template slot-scope="scope">
+                            {{ scope.row.success ? scope.row.success + '条' : '-' }}
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="结算失败" width="80">
+                        <template slot-scope="scope">{{ scope.row.fail ? scope.row.fail + '条' : '-' }}</template>
+                    </el-table-column>
+                    <el-table-column label="未结算" width="80">
+                        <template slot-scope="scope">{{ scope.row.none ? scope.row.none + '条' : '-' }}</template>
+                    </el-table-column>
                 </el-table-column>
 
-                <el-table-column prop="js_fail" label="结算失败">
-                    <template slot-scope="scope">{{ scope.row.js_fail ? scope.row.js_fail + '条' : '-' }}</template>
+                <el-table-column label="结算清单">
+                    <el-table-column prop="js_count" label="总计" width="80">
+                        <template slot-scope="scope">
+                            {{ scope.row.js_count ? scope.row.js_count + '条' : '-' }}</template
+                        >
+                    </el-table-column>
+                    <el-table-column prop="js_success" label="成功" width="80">
+                        <template slot-scope="scope">
+                            {{ scope.row.js_success ? scope.row.js_success + '条' : '-' }}</template
+                        >
+                    </el-table-column>
+                    <el-table-column prop="js_fail" label="失败" width="80">
+                        <template slot-scope="scope">{{ scope.row.js_fail ? scope.row.js_fail + '条' : '-' }}</template>
+                    </el-table-column>
+                    <el-table-column prop="js_none" label="未结算" width="80">
+                        <template slot-scope="scope">{{ scope.row.js_none ? scope.row.js_none + '条' : '-' }}</template>
+                    </el-table-column>
                 </el-table-column>
-                <!--                 <el-table-column prop="success" label="结算成功">
-    <template slot-scope="scope"> {{ scope.row.success }}条 </template>
-</el-table-column>
-<el-table-column prop="fail" label="结算失败">
-    <template slot-scope="scope"> {{ scope.row.fail }}条 </template>
-</el-table-column>
-<el-table-column prop="jf_success" label="积分结算(包括清算)">
-    <template slot-scope="scope"> {{ scope.row.jf_success }}条 </template>
-</el-table-column> -->
-                <!-- <el-table-column prop="js_fail" label="结算清单未结算">
-                    <template slot-scope="scope"> {{ scope.row.js_fail ? scope.row.js_fail + '条' : '-' }}</template>
-                </el-table-column> -->
 
-                <el-table-column prop="none" label="没结算清单">
-                    <template slot-scope="scope">{{ scope.row.none ? scope.row.none + '条' : '-' }}</template>
+                <el-table-column label="积分清单">
+                    <el-table-column prop="jf_count" label="总计" width="80">
+                        <template slot-scope="scope">
+                            {{ scope.row.jf_count ? scope.row.jf_count + '条' : '-' }}</template
+                        >
+                    </el-table-column>
+                    <el-table-column prop="jf_success" label="成功" width="80">
+                        <template slot-scope="scope">
+                            {{ scope.row.jf_success ? scope.row.jf_success + '条' : '-' }}</template
+                        >
+                    </el-table-column>
+                    <el-table-column prop="jf_fail" label="失败" width="80">
+                        <template slot-scope="scope">{{ scope.row.jf_fail ? scope.row.jf_fail + '条' : '-' }}</template>
+                    </el-table-column>
+                    <el-table-column prop="jf_none" label="未结算" width="80">
+                        <template slot-scope="scope">{{ scope.row.jf_none ? scope.row.jf_none + '条' : '-' }}</template>
+                    </el-table-column>
                 </el-table-column>
 
-                <el-table-column prop="js_none" label="没有结算清单">
-                    <template slot-scope="scope">{{ scope.row.js_none ? scope.row.js_none + '条' : '-' }}</template>
-                </el-table-column>
-                <!--   <el-table-column prop="jf_fail" label="积分未结算">
-                    <template slot-scope="scope"> {{ scope.row.jf_fail }}条 </template>
-                </el-table-column> -->
-
-                <el-table-column prop="jf_none" label="没有积分清单">
-                    <template slot-scope="scope"> {{ scope.row.jf_none ? scope.row.jf_none + '条' : '-' }} </template>
+                <el-table-column label="改速率">
+                    <el-table-column prop="gs_count" label="总计" width="80">
+                        <template slot-scope="scope">
+                            {{ scope.row.gs_count ? scope.row.gs_count + '条' : '-' }}</template
+                        >
+                    </el-table-column>
+                    <el-table-column prop="gs_success" label="成功" width="80">
+                        <template slot-scope="scope">
+                            {{ scope.row.gs_success ? scope.row.gs_success + '条' : '-' }}</template
+                        >
+                    </el-table-column>
+                    <el-table-column prop="gs_fail" label="失败" width="80">
+                        <template slot-scope="scope">{{ scope.row.gs_fail ? scope.row.gs_fail + '条' : '-' }}</template>
+                    </el-table-column>
+                    <el-table-column prop="gs_none" label="未结算" width="80">
+                        <template slot-scope="scope">{{ scope.row.gs_none ? scope.row.gs_none + '条' : '-' }}</template>
+                    </el-table-column>
                 </el-table-column>
 
                 <el-table-column label="操作">
@@ -457,8 +493,10 @@ export default {
             let sql = [
                 // 账期受理清单
                 `select zq.type as zq_type,zq.list_id, zq.state as zq_state,a.* from zhangqi zq left join accept a on zq.list_id=a.id where ${where}`,
+
                 // 结算清单
                 `select zq.type as zq_type, zq.state as zq_state,a.*,b.date as b_date,b.branch as b_branch,b.commission_money as b_money,b.order_id as b_order_id,b.user_number as b_user_member from zhangqi zq left join accept a on zq.list_id=a.id left join bill b on b.id = zq.qd_id where ${where} and zq.type=1`,
+                `select zq.type as zq_type, zq.state as zq_state,a.*,b.date as b_date,b.branch as b_branch,b.commission_money as b_money,b.order_id as b_order_id,b.user_number as b_user_member from zhangqi zq left join accept a on zq.list_id=a.id left join bill b on b.id = zq.qd_id where ${where} and zq.type=3`,
                 // 积分清单
                 `select zq.type as zq_type, zq.state as zq_state,zq.date as zq_date,a.*,j.* from zhangqi zq left join accept a on zq.list_id=a.id left join jifen j on j.id = zq.qd_id where ${where} and zq.type=2`
             ]
@@ -472,14 +510,15 @@ export default {
                 })
             })
 
-            Promise.all(sql).then(([all, js_list, jf_list]) => {
+            Promise.all(sql).then(([all, js_list, gs_list, jf_list]) => {
                 // 组装数据
                 all = this.formatAllDatas(all)
                 js_list = this.formatJsList(js_list)
                 jf_list = this.formatJFList(jf_list)
+                gs_list = this.formatJsList(gs_list, '改速率')
 
                 // 下载
-                this.onDownload([all, ...js_list, ...jf_list], `${date}受理清单结算信息`)
+                this.onDownload([all, ...js_list, ...jf_list, ...gs_list], `${date}受理清单结算信息`)
                 this.downSlListLoading = false
             })
         },
@@ -520,7 +559,7 @@ export default {
             ]
         },
         // 导出结算清单
-        formatJsList(js_list) {
+        formatJsList(js_list, actionType) {
             let suss = [],
                 fail = [],
                 none = [],
@@ -559,10 +598,10 @@ export default {
             fail = this.parseAoaData(fail, json)
             none = this.parseAoaData(none, json)
             return [
-                { datas: all, bookName: '全部结算清单' },
-                { datas: suss, bookName: '结算清单(成功)' },
-                { datas: fail, bookName: '结算清单(失败)' },
-                { datas: none, bookName: '结算清单(没有结算清单)' }
+                { datas: all, bookName: `全部${actionType ? '改速率' : '结算'}清单` },
+                { datas: suss, bookName: `${actionType ? '改速率' : '结算'}清单(成功)` },
+                { datas: fail, bookName: `${actionType ? '改速率' : '结算'}清单(失败)` },
+                { datas: none, bookName: `${actionType ? '改速率' : '结算'}清单(没有结算清单)` }
             ]
         },
         formatAllDatas(all) {
@@ -589,7 +628,7 @@ export default {
             return new Promise(resolve => {
                 const sql = [0, 1, -1]
                     .map(e => {
-                        return [1, 2]
+                        return [1, 2, 3]
                             .map(e2 => {
                                 return `select count(*) as count,state,type from zhangqi where state=${e} and type=${e2} and date < ${max} group by state,type`
                             })
@@ -603,43 +642,65 @@ export default {
                     // arr[e.date].count_succ = success + fail + jf_success
 
                     let data = {
-                        date: '总计',
-                        count: 0,
-                        none: 0,
-                        success: 0,
-                        fail: 0,
+                        date: '总计', //账期
+                        count: 0, //总需要结算
+                        none: 0, //总：未结算
+                        success: 0, //总：结算成功
+                        fail: 0, //总：结算失败
+
                         js_fail: 0,
                         js_none: 0,
-                        jf_none: 0
+                        js_success: 0,
+                        js_count: 0,
+
+                        jf_count: 0,
+                        jf_success: 0,
+                        jf_none: 0,
+
+                        gs_count: 0,
+                        gs_fail: 0,
+                        gs_success: 0,
+                        gs_none: 0
                     }
                     res.forEach(e => {
                         let count = e.count | 0
                         data.count += count
 
-                        // if (e.state != 1) {
-                        //                             // data.count += count
-                        //                             data.fail += count
-                        //                         }else{
-                        //                             data.success+=count
-                        //                         }
+                        if (e.state == 1) {
+                            data.success += count
 
-                        if (e.type == 1) {
-                            // 结算清单
-                            if (e.state == 1) {
-                                data.success += count
-                            } else if (e.state == -1) {
-                                data.fail += count
-                                data.js_fail += count
+                            if (e.type == 1) {
+                                data.js_success += count
+                                data.js_count += count
+                            } else if (e.type == 2) {
+                                data.jf_success += count
+                                data.jf_count += count
                             } else {
+                                data.gs_success += count
+                                data.gs_count += count
+                            }
+                        } else if (e.state == 0) {
+                            data.none += count
+
+                            if (e.type == 1) {
                                 data.js_none += count
-                                data.none += count
+                                data.js_count += count
+                            } else if (e.type == 2) {
+                                data.jf_count += count
+                                data.jf_none += count
+                            } else {
+                                data.gs_count += count
+                                data.gs_none += count
                             }
                         } else {
-                            if (e.state != 1) {
-                                data.jf_none += count
-                                data.none += count
-                            } else {
-                                data.success += count
+                            data.fail += count
+
+                            if (e.type == 1) {
+                                data.js_fail += count
+                                data.js_count += count
+                            } else if (e.type == 2) {
+                                data.jf_fail += count
+                                data.jf_count += count
                             }
                         }
                     })
@@ -658,7 +719,7 @@ export default {
                 .format('YYYYMM')*/
             const sql = [0, 1, -1]
                 .map(e => {
-                    return [1, 2]
+                    return [1, 2, 3]
                         .map(e2 => {
                             return `select count(*) as count,date,state,type from zhangqi where date < ${max} and state=${e} and type=${e2} group by date  `
                         })
@@ -667,13 +728,41 @@ export default {
                 .join(' union all ')
 
             this.$db.all(sql, (err, res) => {
+                console.log('fetchSlLists', res)
                 const arr = {}
                 res.forEach(e => {
                     if (!arr[e.date]) {
                         arr[e.date] = { date: e.date, js_none: 0, js_fail: 0, js_success: 0, jf_success: 0, jf_fail: 0 }
                     }
+                    arr[e.date].count += e.count
 
                     if (e.type == 1) {
+                        if (e.state == 1) {
+                            arr[e.date].js_success += e.count
+                        } else if (e.state == -1) {
+                            arr[e.date].js_fail += e.count
+                        } else {
+                            arr[e.date].js_none += e.count
+                        }
+                    } else if (e.type == 2) {
+                        if (e.state == 1) {
+                            arr[e.date].jf_success += e.count
+                        } else {
+                            arr[e.date].jf_none += e.count
+                        }
+                    } else if (e.type == 3) {
+                        if (e.state == 1) {
+                            arr[e.date].gs_success += e.count
+                        } else if (e.state == -1) {
+                            arr[e.date].gs_fail += e.count
+                        } else {
+                            arr[e.date].gs_none += e.count
+                        }
+                    }
+
+                    /*// 结算清单
+                    if (e.type == 1) {
+
                         let key = 'js_none'
                         if (e.state == 1) {
                             key = 'js_success'
@@ -691,10 +780,10 @@ export default {
                     }
                     const { js_success = 0, js_none = 0, js_fail = 0, jf_success = 0, jf_none = 0 } = arr[e.date]
 
-                    arr[e.date].count = js_success + js_none + js_fail + jf_success + jf_none
+                    // arr[e.date].count = js_success + js_none + js_fail + jf_success + jf_none
                     // arr[e.date].fail = js_fail + jf_none
                     arr[e.date].none = js_none + jf_none
-                    arr[e.date].success = js_success + jf_success
+                    arr[e.date].success = js_success + jf_success*/
                 })
                 this.fetchSlListsAll().then(res => {
                     let lists = Object.values(arr).sort((a, b) => b.date - a.date)

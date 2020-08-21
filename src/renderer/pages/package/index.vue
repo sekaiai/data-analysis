@@ -27,14 +27,36 @@
                     </template>
                 </el-table-column>
 
-                <el-table-column prop="name" label="发展套餐名称" width="300"> </el-table-column>
+                <el-table-column prop="name" label="发展套餐名称" width="200"> </el-table-column>
+                <el-table-column prop="alias" label="套餐别名" width="200">
+                    <template slot-scope="props">
+                        <template v-if="props.row.alias">
+                            <p v-for="(v, i) in formatAlias(props.row.alias)" :key="i">{{ v }}</p>
+                        </template>
+                        <template v-else>-</template>
+                    </template>
+                </el-table-column>
                 <!-- <el-table-column prop="__count" label="本月待结算受理数"></el-table-column> -->
                 <!-- <el-table-column prop="__nums" label="本月待受理清单"></el-table-column> -->
-                <!-- <el-table-column prop="accept_count" label="关联受理清单"></el-table-column> -->
-                <el-table-column prop="law_js" label="结算规律（结算清单）"> </el-table-column>
-                <el-table-column prop="count_js" label="结算次数（结算清单）"> </el-table-column>
-                <el-table-column prop="law_jf" label="结算规律（积分）"> </el-table-column>
-                <el-table-column prop="count_jf" label="结算次数（积分）"> </el-table-column>
+                <el-table-column prop="accept_count" label="统计">
+                    <el-table-column prop="accept_count" label="需要结算"></el-table-column>
+                    <el-table-column prop="yjs" label="已结算"></el-table-column>
+                </el-table-column>
+
+                <el-table-column prop="accept_count" label="结算规律">
+                    <el-table-column prop="count_js" label="次数"> </el-table-column>
+                    <el-table-column prop="law_js" label="规律"> </el-table-column>
+                </el-table-column>
+
+                <el-table-column prop="accept_count" label="积分结算规律">
+                    <el-table-column prop="count_jf" label="次数"> </el-table-column>
+                    <el-table-column prop="law_jf" label="规律"> </el-table-column>
+                </el-table-column>
+                <el-table-column prop="accept_count" label="改数率结算规则">
+                    <el-table-column prop="count_gs" label="次数"> </el-table-column>
+                    <el-table-column prop="law_gs" label="规律"> </el-table-column>
+                </el-table-column>
+
                 <el-table-column fixed="right" label="操作" width="120">
                     <template slot-scope="scope">
                         <el-button @click.native.prevent="deleteTaocan(scope.row.id)" type="text" size="small">
@@ -64,6 +86,15 @@
                     <div class="taocao-tip">*必须与受理清单表和结算表中的套餐名称一致！</div>
                     <el-input v-model="ruleForm['name']"></el-input>
                 </el-form-item>
+                <el-form-item prop="alias" label="发展套餐别名">
+                    <div class="taocao-tip">多个套餐别名用回车换行</div>
+                    <el-input v-model="ruleForm['alias']" type="textarea"></el-input>
+                </el-form-item>
+                <ul class="alias">
+                    <li v-for="(v, i) in aliasList" :key="i">{{ v }}</li>
+                </ul>
+                <div class="title-line">结算规则</div>
+
                 <el-form-item prop="count_js" label="结算次数（结算清单）">
                     <!-- <el-input v-model="ruleForm['count']"></el-input> -->
                     <div class="el-input">
@@ -73,15 +104,26 @@
                 <el-form-item prop="law_js" label="结算规律（结算清单）">
                     <el-input v-model="ruleForm['law_js']"></el-input>
                 </el-form-item>
-
-                <el-form-item prop="count_jf" label="结算次数（积分）">
+                <div class="title-line">积分结算规则</div>
+                <el-form-item prop="count_jf" label="结算次数">
                     <!-- <el-input v-model="ruleForm['count']"></el-input> -->
                     <div class="el-input">
                         <el-input-number v-model="ruleForm['count_jf']" :min="0"></el-input-number>
                     </div>
                 </el-form-item>
-                <el-form-item prop="law_jf" label="结算规律（积分）">
+                <el-form-item prop="law_jf" label="结算规律">
                     <el-input v-model="ruleForm['law_jf']"></el-input>
+                </el-form-item>
+
+                <div class="title-line">改数率结算规则</div>
+                <el-form-item prop="count_gs" label="结算次数（改数率）">
+                    <!-- <el-input v-model="ruleForm['count']"></el-input> -->
+                    <div class="el-input">
+                        <el-input-number v-model="ruleForm['count_gs']" :min="0"></el-input-number>
+                    </div>
+                </el-form-item>
+                <el-form-item prop="law_gs" label="结算规律">
+                    <el-input v-model="ruleForm['law_gs']"></el-input>
                 </el-form-item>
 
                 <el-form-item prop="law_desc" label="备注信息、结算说明">
@@ -131,12 +173,19 @@ export default {
                 law_js: '', //结算规律
                 count_jf: 0, //结算次数
                 law_jf: '', //结算规律
+                count_gs: 0, //结算次数
+                law_gs: 0, //结算次数
                 law_desc: '' //规律说明
             },
             rules: {
                 name: [{ required: true, message: '请输入发展套餐名称', trigger: 'blur' }],
                 count_js: [{ required: true, message: '请输入结算次数', trigger: 'blur' }],
                 count_jf: [{ required: true, message: '请输入结算次数', trigger: 'blur' }],
+                count_gs: [{ required: true, message: '请输入改数率结算次数', trigger: 'blur' }],
+                law_gs: [
+                    { required: true, message: '请输入改数率结算规律', trigger: 'blur' },
+                    { validator: validatePass }
+                ],
                 law_jf: [
                     { required: true, message: '请输入结算次数规律', trigger: 'blur' },
                     { validator: validatePass }
@@ -152,7 +201,18 @@ export default {
     created() {
         this.fetchDatas()
     },
+    computed: {
+        aliasList() {
+            const { alias } = this.ruleForm
+            return this.formatAlias(alias)
+        }
+    },
     methods: {
+        formatAlias(alias) {
+            return String(alias)
+                .split(/[\n,]/g)
+                .filter(e => e && e !== 'undefined' && e != 'null')
+        },
         openAddTaocan(v) {
             // 从tag添加套餐
             this.ruleForm = {
@@ -162,6 +222,8 @@ export default {
                 law_js: '', //结算规律
                 law_jf: '', //结算规律
                 count_jf: 0, //结算次数
+                count_gs: 0, //结算次数
+                law_gs: 0, //结算次数
                 law_desc: '' //规律说明
             }
             this.isShowAddTaocan = true
@@ -173,7 +235,7 @@ export default {
             const sql = `select ${key} as val from accept group by ${key}`
             this.$db.all(sql, (err, res) => {
                 if (err) {
-                    this.$logger(err)
+                    console.log(err)
                 } else {
                     // this.dataListTotalCount = res.totalCount;
                     const data = res.map(e => e.val).filter(e => e && !hasd.includes(e))
@@ -190,10 +252,11 @@ export default {
             this.isShowAddTaocan = true
         },
         fetchDatas() {
-            const sql = 'select p.* from pgk p'
+            const sql =
+                'select p.*,(select count(z.id) from zhangqi z where pgk_id=p.id) as accept_count,(select count(z.id) from zhangqi z where z.pgk_id=p.id and z.state=1) as yjs from pgk p'
 
             this.$db.all(sql, (err, res) => {
-                this.$logger(err, res)
+                console.log('fetchDatas', err, res)
                 if (!err) {
                     this.datas = res
                     this.getTaocan(res)
@@ -222,9 +285,12 @@ export default {
                     if (k === 'name') {
                         v = v.toString().trim()
                     }
-                    params.push(`${k}='${v}'`)
+                    if (k !== 'accept_count' && k !== 'yjs') {
+                        params.push(`${k}='${v}'`)
+                    }
                 }
                 params = params.join(',')
+                console.log('params', params)
                 sql = `update pgk set ${params} where id=${this.isedit}`
             } else {
                 const keys = Object.keys(this.ruleForm)
@@ -234,6 +300,7 @@ export default {
             this.loading = true
             this.$db.run(sql, (err, res) => {
                 if (err) {
+                    console.log('addTaocan', err)
                     this.loading = false
 
                     this.$message({
@@ -245,10 +312,12 @@ export default {
                         this.$db.get(`select last_insert_rowid() as id from pgk`, (err, res) => {
                             updateZhangqi(res.id).then(res => {
                                 this.loading = false
+                                this.fetchDatas()
                             })
                         })
                     } else {
                         updateZhangqi(this.isedit).then(res => {
+                            this.fetchDatas()
                             this.loading = false
                         })
                     }
@@ -256,9 +325,8 @@ export default {
                     this.isShowAddTaocan = false
 
                     // 更新账期数据
-                    this.fetchDatas()
                 }
-                this.$logger(err)
+                console.log(err)
             })
         },
 
@@ -344,6 +412,13 @@ export default {
     .span {
         color: red;
         cursor: pointer;
+    }
+}
+ul.alias {
+    list-style: inside;
+    li {
+        line-height: 1.6;
+        margin: 0;
     }
 }
 </style>

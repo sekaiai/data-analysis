@@ -48,3 +48,16 @@ http://service.gz.189.cn/wtcommission/index.php/api/popedom/sendMes/default.shtm
 #### 结算清单
 
 根据结算清单判断
+
+#### todo: update
+
+- 每个表添加一个 套餐 ID
+- 套餐修改更新账期表
+- 套餐执行更新或者删除，重新统计相关表的套餐 ID
+- 添加清单更新清单的套餐 ID
+
+受影响的表
+
+```
+bill, jifen, accept
+```

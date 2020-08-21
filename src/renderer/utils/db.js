@@ -12,6 +12,25 @@ const sqlite3 = sq3.verbose()
 const db = new sqlite3.Database(dbPath)
 
 db.serialize(() => {
+    db.run(`ALTER TABLE jifen ADD pgk_id INTEGER`, err => {
+        console.log('ALTER TABLE jifen', err)
+    })
+    db.run(`ALTER TABLE bill ADD pgk_id INTEGER`, err => {
+        console.log('ALTER TABLE bill', err)
+    })
+    db.run(`ALTER TABLE accept ADD pgk_id INTEGER`, err => {
+        console.log('ALTER TABLE accept', err)
+    })
+    db.run(`ALTER TABLE pgk ADD alias VARCHAR(500)`, err => {
+        console.log('ALTER TABLE pgk', err)
+    })
+
+    db.run(`ALTER TABLE pgk ADD count_gs VARCHAR(500)`, err => {
+        console.log('ALTER TABLE count_gs', err)
+    })
+    db.run(`ALTER TABLE pgk ADD law_gs VARCHAR(500)`, err => {
+        console.log('ALTER TABLE law_gs', err)
+    })
     /*/ 受理表
      * no: '购物车流水号',
      * area: '地区',
@@ -38,6 +57,7 @@ db.serialize(() => {
       area VARCHAR(255),
       addr VARCHAR(255),
       acceptor VARCHAR(255),
+      pgk_id INTEGER,
       product_name VARCHAR(255),
       product_type VARCHAR(255),
       product_main VARCHAR(255),
@@ -64,7 +84,12 @@ db.serialize(() => {
     db.run(`CREATE UNIQUE INDEX action_no ON accept (action_no,product_main)`, err => {
         console.log(err)
     })
-
+    db.run(`CREATE INDEX acc_pgk_id ON accept (pgk_id)`, err => {
+        console.log(err)
+    })
+    db.run(`CREATE INDEX acc_action ON accept (action)`, err => {
+        console.log(err)
+    })
     db.run(`CREATE INDEX action_no ON accept (action_no)`, err => {
         console.log(err)
     })
@@ -86,6 +111,8 @@ db.serialize(() => {
      * name: 套餐名称
      * count_js： 结算结算次数
      * count_jf： 积分结算次数
+     * count_gs: 改数率结算次数
+     * law_gs:   改数率结算规律
      * law_js:   结算清单结算规律
      * law_jf:   积分结算规律
      * law_desc: 结算规律说明
@@ -96,8 +123,11 @@ db.serialize(() => {
         `CREATE TABLE pgk(
      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
      name VARCHAR(200) NOT NULL,
+     alias VARCHAR(500),
      count_js INTEGER NOT NULL,
      count_jf INTEGER NOT NULL,
+     count_gs INTEGER NOT NULL,
+     law_gs VARCHAR(255) NOT NULL,
      law_js VARCHAR(255) NOT NULL,
      law_jf VARCHAR(255) NOT NULL,
      law_desc VARCHAR(255)
@@ -134,23 +164,24 @@ db.serialize(() => {
     // })
     db.run(
         `create table bill(
-    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-date varchar(200),
-order_id varchar(200),
-complete_date varchar(200),
-commission_policy varchar(200),
-commission_type varchar(200),
-commission_money varchar(200),
-package_name varchar(200) NOT NULL,
-product_name varchar(200),
-user_id varchar(200),
-user_number varchar(200) NOT NULL,
-not_found_user INTEGER DEFAULT 0,
-status INTEGER,
-cause varchar(200),
-branch varchar(200),
-created varchar(200),
-branch_id varchar(100)
+        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+        date varchar(200),
+        order_id varchar(200),
+        complete_date varchar(200),
+        commission_policy varchar(200),
+        commission_type varchar(200),
+        commission_money varchar(200),
+        pgk_id INTEGER,
+        package_name varchar(200) NOT NULL,
+        product_name varchar(200),
+        user_id varchar(200),
+        user_number varchar(200) NOT NULL,
+        not_found_user INTEGER DEFAULT 0,
+        status INTEGER,
+        cause varchar(200),
+        branch varchar(200),
+        created varchar(200),
+        branch_id varchar(100)
     )`,
         err => {
             console.log(err)
@@ -164,6 +195,10 @@ branch_id varchar(100)
     // db.run(`CREATE UNIQUE INDEX order_id_status ON bill (order_id,status)`, err => {
     //     console.log(err)
     // })
+
+    db.run(`CREATE INDEX bill_pgk_id ON bill (pgk_id)`, err => {
+        console.log(err)
+    })
 
     db.run(`CREATE INDEX branch_id ON bill (branch_id)`, err => {
         console.log(err)
@@ -207,13 +242,13 @@ branch_id varchar(100)
      */
     db.run(
         `create table related_user(
-    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-a1 varchar(200) NOT NULL,
-a2 varchar(200),
-a3 varchar(200),
-a4 varchar(200),
-a5 varchar(200),
-a6 varchar(200)
+        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+        a1 varchar(200) NOT NULL,
+        a2 varchar(200),
+        a3 varchar(200),
+        a4 varchar(200),
+        a5 varchar(200),
+        a6 varchar(200)
     )`,
         err => {
             console.log(err)
@@ -270,6 +305,7 @@ a6 varchar(200)
         user_number varchar(200),
         xs_instance_id varchar(200),
         package_name varchar(200),
+        pgk_id INTEGER,
         rw_date varchar(200),
         hyjh varchar(200),
         jf_jiesuan varchar(200),
@@ -282,6 +318,11 @@ a6 varchar(200)
             console.log(err)
         }
     )
+
+    db.run(`CREATE INDEX jifen_pgk_id ON jifen (pgk_id)`, err => {
+        console.log(err)
+    })
+
     db.run(`create index jifen_date ON related_user (date)`, err => {
         console.log(err)
     })
