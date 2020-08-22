@@ -356,8 +356,9 @@ export default {
                 }
             }
             this.onFetchMonthLength()
-            this.insertStatus = false
-            SLinsertZhangqi(max_id)
+            SLinsertZhangqi(max_id).then(res => {
+                this.insertStatus = false
+            })
         }
     }
 }

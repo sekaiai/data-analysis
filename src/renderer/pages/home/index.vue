@@ -6,7 +6,7 @@
         <div @click="fetchSlListsAll">fetchSlListsAll</div>
  -->
         <!-- <div @click="fetchSlListsAll">fetchSlListsAll</div> -->
-
+        <!-- {{ formatDay(1597929875) }} -->
         <div>
             <div class="title-line">
                 受理清单
@@ -460,6 +460,9 @@ export default {
         this.onInit()
     },
     methods: {
+        formatDay(date) {
+            return dayjs.unix(date).format('YYYY-MM-DD HH:mm:ss')
+        },
         onInit() {
             console.log('onInit')
             this.fetchJsLists()
@@ -615,6 +618,9 @@ export default {
             all = all.map(e => {
                 e.zq_type = e.zq_type == 2 ? '积分结算' : '结算清单'
                 e.zq_state = e.zq_state == -1 ? '结算失败' : e.zq_state == 1 ? '结算成功' : '没有结算信息'
+                e.created = dayjs.unix(e.created).format('YYYY-MM-DD HH:mm:ss')
+                e.date_end = dayjs.unix(e.date_end).format('YYYY-MM-DD HH:mm:ss')
+
                 return e
             })
 
@@ -711,6 +717,7 @@ export default {
         },
         // 获取受理清单
         fetchSlLists() {
+            console.log('fetchSlLists')
             // 账期  需结算 结算成功    结算失败    没有结算清单  积分清单    没有积分清单  操作
 
             const max = dayjs().format('YYYYMM')
@@ -732,30 +739,48 @@ export default {
                 const arr = {}
                 res.forEach(e => {
                     if (!arr[e.date]) {
-                        arr[e.date] = { date: e.date, js_none: 0, js_fail: 0, js_success: 0, jf_success: 0, jf_fail: 0 }
+                        arr[e.date] = {
+                            count: 0,
+                            success: 0,
+                            fail: 0,
+                            none: 0,
+                            date: e.date,
+                            js_none: 0,
+                            js_fail: 0,
+                            js_success: 0
+                        }
                     }
+
                     arr[e.date].count += e.count
 
                     if (e.type == 1) {
                         if (e.state == 1) {
+                            arr[e.date].success += e.count
                             arr[e.date].js_success += e.count
                         } else if (e.state == -1) {
+                            arr[e.date].fail += e.count
                             arr[e.date].js_fail += e.count
                         } else {
+                            arr[e.date].none += e.count
                             arr[e.date].js_none += e.count
                         }
                     } else if (e.type == 2) {
                         if (e.state == 1) {
+                            arr[e.date].success += e.count
                             arr[e.date].jf_success += e.count
                         } else {
+                            arr[e.date].none += e.count
                             arr[e.date].jf_none += e.count
                         }
                     } else if (e.type == 3) {
                         if (e.state == 1) {
                             arr[e.date].gs_success += e.count
+                            arr[e.date].success += e.count
                         } else if (e.state == -1) {
+                            arr[e.date].fail += e.count
                             arr[e.date].gs_fail += e.count
                         } else {
+                            arr[e.date].none += e.count
                             arr[e.date].gs_none += e.count
                         }
                     }
@@ -2080,7 +2105,7 @@ export default {
             return new Promise(resolve => {
                 if (fun.length) {
                     Promise.all(fun).then(res => {
-                        updateZhangqiJifenState(last_js_id, 'bill', this)
+                        updateZhangqiJifenState(last_js_id, 'bill')
                         resolve(true)
                     })
                 } else {

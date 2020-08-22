@@ -71,7 +71,7 @@ const computedZhangqiState = async pgk_id => {
     let js_qingdan = await fetchPgkid2qingdan(pgk_id, 'bill')
     let jf_qingdan = await fetchPgkid2qingdan(pgk_id, 'jifen')
 
-    // console.log({ js_qingdan, jf_qingdan })
+    console.log({ js_qingdan, jf_qingdan })
     let promiseArr = []
 
     for (let i = 0; i < js_qingdan.length; i++) {
@@ -84,6 +84,7 @@ const computedZhangqiState = async pgk_id => {
             // console.log('state -1', state)
         }
         let params = { accept_id, pgk_id, state, type: accept_action === '新装' ? 1 : 3, date, qd_id }
+        console.log('computedZhangqiState', params)
         promiseArr.push(updateZhangqiState(params))
     }
 
@@ -143,7 +144,7 @@ const updateZhangqiJifenState = async (last_id, type = 'bill') => {
     }
 
     DB.all(sql, async (err, res = []) => {
-        // console.log(res, sql)
+        console.log('updateZhangqiJifenState', res, sql)
         if (!res || !res.length) {
             return
         }
@@ -166,6 +167,7 @@ const updateZhangqiJifenState = async (last_id, type = 'bill') => {
                 state: type === 'bill' ? (v.status | 0 ? 1 : -1) : 1,
                 qd_id: v.id
             }
+            console.log('updateZhangqiJifenState', params)
             updateZhangqiState(params)
         }
         /*
@@ -284,7 +286,7 @@ const fetchPgkid2qingdan = (pgk_id, table = 'bill') => {
                 ? `select date,user_number,id,status from ${table} where pgk_id='${pgk_id}'`
                 : `select date,user_number,id from ${table} where pgk_id='${pgk_id}'`
         DB.all(sql, (err, res = []) => {
-            // console.log('fetchPgk2qingdan', res, sql, err)
+            console.log('fetchPgk2qingdan', res, sql, err)
             reslove(res)
         })
     })
@@ -308,9 +310,9 @@ const fetchPgk2qingdan = (pgk_name, table = 'bill') => {
 // 获取受理清单ID
 const fetchAcceptId = (user_number, pgk_id) => {
     return new Promise(reslove => {
-        let sql = `select id,action from accept where (user_number = ${user_number} or action_no=${user_number}) and pgk_id='${pgk_id}'`
+        let sql = `select id,action from accept where (user_number = '${user_number}' or action_no='${user_number}') and pgk_id='${pgk_id}'`
         DB.get(sql, (err, res = {}) => {
-            // console.log('fetchAcceptId', res, sql)
+            console.log('fetchAcceptId', res, sql)
             if (!res.id) {
                 // 没有找到受理清单ID，从副卡中获取数据
                 fetchAcceptId2Re({ user_number, pgk_id }).then(res2 => {
@@ -330,7 +332,7 @@ const fetchAcceptId2Re = ({ user_number, pgk_id }) => {
             if (res && res.a1) {
                 // 更新受理清单副卡
                 let action_no = res.a1
-                let sql = `select id,action from accept where (user_number = ${user_number} or action_no=${action_no}) and pgk_id='${pgk_id}'`
+                let sql = `select id,action from accept where (user_number = '${user_number}' or action_no='${action_no}') and pgk_id='${pgk_id}'`
 
                 DB.get(sql, (err, res) => {
                     if (res && res.id) {
@@ -362,7 +364,7 @@ const insertZhangqi = async (taocan, accepts) => {
         // 获取他套餐信息
         let { id, count_js, count_jf, count_gs, law_jf, law_js, law_gs } = taocan
         // 2. 添加新账期。 2.1获取受理清单
-
+        console.log('ididididididididididididid', id, taocan)
         // 组装每月结算间隔
         if (!count_js) {
             law_js = []
@@ -409,7 +411,7 @@ const insertZhangqi = async (taocan, accepts) => {
             let { date_end, created, id: accept_id, action } = accepts[i]
             let date = dayjs.unix(date_end || created)
 
-            console.log('date begin', { date })
+            // console.log('date begin', { date })
             if (action === '新装') {
                 // 创建结算(js)清单账期数据
                 for (let i = 0; i < law_js.length; i++) {
@@ -442,7 +444,7 @@ const insertZhangqi = async (taocan, accepts) => {
 
         if (promiseArr.length) {
             Promise.all(promiseArr).then(async values => {
-                // console.log('Promise all', values)
+                console.log('Promise all promiseArr', values)
                 await computedZhangqiState(id)
                 // loading = false
                 reslove(true)
@@ -508,6 +510,8 @@ const updateZhangqi = async id => {
 
     let accepts = await fetchAcceptLists2pgkid(id)
 
+    console.log('这是相关的受理清单', accepts)
+
     return insertZhangqi(taocan, accepts)
 }
 
@@ -522,7 +526,7 @@ const addPgkid = async (taocan = {}, type) => {
     if (!id) return
 
     alias = formatAlias(alias)
-    console.log('addPgkid', { taocan, type, alias })
+    // console.log('addPgkid', { taocan, type, alias })
 
     let clounm_name = 'package_name'
     if (type === 'accept') {
@@ -540,7 +544,7 @@ const addPgkid = async (taocan = {}, type) => {
         }
 
         const sql = `update ${type} set pgk_id=${id} where ${clounm_name}='${name}' ${alias}`
-        console.log(sql)
+        console.log('addPgkid', sql)
         DB.run(sql, (err, res) => {
             console.log('addPgkid', err, res, sql)
             reslove(res)
@@ -618,9 +622,17 @@ const fetchAcceptLists2pgkid = pgk_id => {
  * id int 套餐ID
  */
 const deleteZhangqi = id => {
-    const sql = `delete from zhangqi where pgk_id='${id}'`
-    // console.log({ sql })
-    DB.run(sql, (err, res) => {
+    const sql1 = `delete from zhangqi where pgk_id='${id}'`
+    const sql2 = `update bill set pgk_id=0 where pgk_id=${id}`
+    const sql3 = `update jifen set pgk_id=0 where pgk_id=${id}`
+
+    DB.run(sql1, (err, res) => {
+        console.log('deleteZhangqi', err, res)
+    })
+    DB.run(sql2, (err, res) => {
+        console.log('deleteZhangqi', err, res)
+    })
+    DB.run(sql3, (err, res) => {
         console.log('deleteZhangqi', err, res)
     })
 }
