@@ -312,9 +312,9 @@ const fetchAcceptId = (user_number, pgk_id) => {
     return new Promise(reslove => {
         let sql = `select id,action from accept where (user_number = '${user_number}' or action_no='${user_number}') and pgk_id='${pgk_id}'`
         DB.get(sql, (err, res = {}) => {
-            console.log('fetchAcceptId', res, sql)
             if (!res.id) {
                 // 没有找到受理清单ID，从副卡中获取数据
+                console.log('没有找到受理清单ID，从副卡中获取数据', { user_number, pgk_id })
                 fetchAcceptId2Re({ user_number, pgk_id }).then(res2 => {
                     reslove(res2)
                 })
@@ -327,23 +327,29 @@ const fetchAcceptId = (user_number, pgk_id) => {
 // return {id: accetp_id, to: 结果， from: user_member}
 const fetchAcceptId2Re = ({ user_number, pgk_id }) => {
     return new Promise(reslove => {
-        let sql = `select a1 from related_user where a2='${user_number}' or a3='${user_number}' or a4='${user_number}' or a5='${user_number}' or a6='${user_number}'`
-        DB.get(sql, (err, res) => {
-            if (res && res.a1) {
-                // 更新受理清单副卡
-                let action_no = res.a1
-                let sql = `select id,action from accept where (user_number = '${user_number}' or action_no='${action_no}') and pgk_id='${pgk_id}'`
+        const sql = `select r.id as r_id,a.id, a.action, a.action_no from related_user r left 
+        join accept a on a.action_no=r.a1 or a.action_no=r.a2 or a.action_no=r.a3 or a.action_no=r.a4 or a.action_no=r.a5 or a.action_no=r.a6 
+        where a.action_no is not null and (a1='${user_number}' or a2='${user_number}' or a3='${user_number}' or a4='${user_number}' or a5='${user_number}' or a6='${user_number}')`
 
-                DB.get(sql, (err, res) => {
-                    if (res && res.id) {
-                        let sql = `update accept set user_number='${user_number}' where id=${res.id}`
-                        DB.run(sql, (err, res) => {
-                            // console.log('更新受理清单副卡', user_number)
-                        })
-                        return reslove({ id: res.id, action: res.action, from: user_number, to: action_no })
-                    }
-                    reslove({ id: 0, to: 0 })
+        // let sql = `select * from related_user where a1='${user_number}' or a2='${user_number}' or a3='${user_number}' or a4='${user_number}' or a5='${user_number}' or a6='${user_number}'`
+        // let sql = `select * from related_user where a1='085104871344' or a2='085104871344' or a3='085104871344' or a4='085104871344' or a5='085104871344' or a6='085104871344'`
+        DB.get(sql, (err, res) => {
+            console.log('获取副卡信息', sql, res)
+            if (res && res.id) {
+                // 更新受理清单副卡
+                // let action_no = res.a1
+                // `select r.id,r.a1,a.action_no,a.user_number from related_user r left
+                // join accept a on a.action_no=r.a2 or a.action_no=r.a3 or a.action_no=r.a4 or a.action_no=r.a5 or a.action_no=r.a6
+                // where a.action_no is not null`
+
+                // let sql = `select id,action from accept where (user_number = '${user_number}' or action_no='${action_no}') and pgk_id='${pgk_id}'`
+
+                const { id, action, action_no } = res
+                let sql = `update accept set user_number='${user_number}' where id=${id}`
+                DB.run(sql, (err, res) => {
+                    console.log('update 副卡', err, res)
                 })
+                return reslove({ id, action, from: user_number, to: action_no })
             } else {
                 reslove({ id: 0, to: 0 })
             }
@@ -357,6 +363,7 @@ const fetchAcceptId2Re = ({ user_number, pgk_id }) => {
  * accepts 手里清单
  */
 const insertZhangqi = async (taocan, accepts) => {
+    console.log('--------------------------------------', { accepts })
     return new Promise(reslove => {
         if (!accepts || !accepts.length) {
             return reslove(true)
@@ -419,6 +426,16 @@ const insertZhangqi = async (taocan, accepts) => {
                         .add(law_js[i], 'month')
                         .format('YYYYMM')
 
+                    console.log(
+                        '-------------------------------1',
+                        accepts[i].no,
+                        date_js,
+                        dayjs(date).format('YYYYMM'),
+                        dayjs(date).format('YYYY-MM-DD HH:mm:ss'),
+                        `add:${law_js[i]}`,
+                        `date_end: ${date_end}`
+                    )
+
                     promiseArr.push(insertZhangqiItem(accept_id, id, date_js, 1))
                 }
 
@@ -427,7 +444,6 @@ const insertZhangqi = async (taocan, accepts) => {
                     let date_jf = dayjs(date)
                         .add(law_jf[i], 'month')
                         .format('YYYYMM')
-
                     promiseArr.push(insertZhangqiItem(accept_id, id, date_jf, 2))
                 }
             } else {
@@ -562,26 +578,46 @@ const deletePgkid = async (id, type) => {
 }
 
 const SLinsertZhangqi = async max_id => {
-    let arr = []
-
-    DB.all(`select * from accept from id > max_id`, async (err, res = []) => {
-        // console.log(err, res)
-        // 删除账期
-        for (var i = 0; i < res.length; i++) {
-            if (res[i].pgk_id) {
-                let item = await fetchTaocanItem(res[i].pgk_id)
-                arr.push(insertZhangqi(item, res[i]))
+    console.log({ max_id })
+    return new Promise(reslove => {
+        let arr = []
+        DB.all(`select * from accept where id > ${max_id}`, async (err, res = []) => {
+            console.log('SLinsertZhangqi', err, res)
+            for (var i = 0; i < res.length; i++) {
+                if (res[i].pgk_id) {
+                    let item = await fetchTaocanItem(res[i].pgk_id)
+                    console.log('res[i].pgk_id', res[i].pgk_id, item)
+                    arr.push(insertZhangqi(item, [res[i]]))
+                }
             }
-        }
-    })
 
-    return Promise.all(arr)
+            Promise.all(arr).then(res => {
+                console.log('xxxxxxxxxxxxxxxxxxxxxx', res, arr)
+                reslove(res)
+            })
+        })
+    })
 }
 // 获取套餐通过套餐名
 const fetchTaocanItem2name = name => {
     return new Promise(reslove => {
-        DB.get(`select * from pgk where name=${name}`, (err, res = {}) => {
-            reslove(res)
+        const sql = `select * from pgk where name='${name}' or alias like '%${name}%'`
+        DB.get(sql, (err, res = {}) => {
+            console.log('fetchTaocanItem2name', sql, res)
+            if (res && res.alias) {
+                if (res.name === name) {
+                    reslove(res)
+                } else {
+                    const alias = formatAlias(res.alias)
+                    if (alias.includes(name)) {
+                        reslove(res)
+                    } else {
+                        reslove({})
+                    }
+                }
+            } else {
+                reslove(res)
+            }
         })
     })
 }
@@ -637,4 +673,110 @@ const deleteZhangqi = id => {
     })
 }
 
-export { insertZhangqi, updateZhangqiJifenState, deleteZhangqi2Qingdan, updateZhangqi, deleteZhangqi, SLinsertZhangqi }
+// 导出[受理清单] 所有没有结算清单
+const importSLNoneJS = (pgk_id, date) => {
+    return new Promise(reslove => {
+        let _date = date ? `zq.date=${date}` : true
+
+        // const sql = `select zq.date,a.* from accept a left join zhangqi zq on zq.pgk_id=a.pgk_id where a.pgk_id=${pgk_id} and zq.date=${date} group by a.id`
+        // const sql = `select a.*,zq.qd_id,zq.state,zq.date from accept a left join zhangqi zq on zq.list_id=a.id where a.pgk_id=${pgk_id} and zq.state=0 group by a.id`
+        const sql = `select a.*,zq.qd_id,zq.state,zq.date from accept a left join zhangqi zq on zq.list_id=a.id and ${_date} where a.pgk_id=${pgk_id} and zq.state=0  group by a.id`
+
+        DB.all(sql, (err, res) => {
+            let notfoundItems = {
+                date: '账期',
+                no: '购物车流水号',
+                area: '地区',
+                addr: '渠道名称',
+                acceptor: '受理人',
+                product_name: '产品名称',
+                product_type: '角色名称',
+                product_main: '所属主销售品',
+                action: '业务动作',
+                action_no: '业务号码',
+                user_number: '结算号码(副卡)',
+                created: '受理时间',
+                status: '工单状态',
+                date_end: '竣工时间',
+                user: '揽收人',
+                remark: '备注'
+            }
+            const datas = parseAoaData(res, notfoundItems)
+            reslove(datas)
+
+            console.log(res, sql, datas)
+            /*
+             * 下载excel表格
+             * datas array 表格数据
+             * name string 表格名称
+             */
+            // download.excel2(datas, '没有找到结算清单的受理表')
+        })
+    })
+}
+const parseAoaData = (datas, json = '') => {
+    // json转成execl需要的数组
+
+    const line1 = Object.values(json || this.notfoundItems)
+    const keys = Object.keys(json || this.notfoundItems)
+
+    datas = datas.map(v => {
+        return keys.map(k => {
+            if (k === 'date_end' || k === 'created') {
+                v[k] = dayjs.unix(v[k]).format('YYYY-MM-DD HH:mm:ss')
+            }
+            return v[k]
+        })
+    })
+    datas.unshift(line1)
+    // this.$logger(datas)
+    return datas
+}
+
+// 导出[结算清单] 所有没有受理清单的
+const importJSNoneSL = (pgk_id, date) => {
+    return new Promise(reslove => {
+        let _date = date ? `b.date=${date}` : true
+        const sql = `select b.* from bill b where ${_date} and b.pgk_id=125 and b.id not in (select zq.qd_id from zhangqi zq where zq.pgk_id=125 and zq.qd_id is not null)`
+        // const sql = `select zq.date,zq.state,b.* from bill b left join zhangqi zq on zq.pgk_id=b.pgk_id where zq.state=0 and b.pgk_id=${pgk_id} and zq.date='${date}' group by b.id`
+        DB.all(sql, (err, res) => {
+            let notfoundItems = {
+                date: '账期',
+                order_id: '订单号',
+                complete_date: '订单竣工时间',
+                commission_policy: '佣金结算策略',
+                commission_type: '佣金结算类型',
+                commission_money: '佣金结算金额（元）',
+                package_name: '发展套餐名',
+                product_name: '产品类型',
+                user_id: '用户ID',
+                user_number: '用户号码',
+                status: '是否成功结算',
+                cause: '原因',
+                branch: '网点名称'
+            }
+
+            const datas = parseAoaData(res, notfoundItems)
+            reslove(datas)
+
+            /*
+             * 下载excel表格
+             * datas array 表格数据
+             * name string 表格名称
+             */
+            // download.excel2(datas, '没有找到结算清单的受理表')
+        })
+    })
+}
+
+export {
+    importSLNoneJS,
+    importJSNoneSL,
+    insertZhangqi,
+    updateZhangqiJifenState,
+    deleteZhangqi2Qingdan,
+    fetchTaocanItem2name,
+    updateZhangqi,
+    deleteZhangqi,
+    SLinsertZhangqi
+}

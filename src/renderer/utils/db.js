@@ -12,46 +12,27 @@ const sqlite3 = sq3.verbose()
 const db = new sqlite3.Database(dbPath)
 
 db.serialize(() => {
-    db.run(`ALTER TABLE jifen ADD pgk_id INTEGER`, err => {
-        console.log('ALTER TABLE jifen', err)
-    })
-    db.run(`ALTER TABLE bill ADD pgk_id INTEGER`, err => {
-        console.log('ALTER TABLE bill', err)
-    })
-    db.run(`ALTER TABLE accept ADD pgk_id INTEGER`, err => {
-        console.log('ALTER TABLE accept', err)
-    })
-    db.run(`ALTER TABLE pgk ADD alias VARCHAR(500)`, err => {
-        console.log('ALTER TABLE pgk', err)
-    })
-
-    db.run(`ALTER TABLE pgk ADD count_gs VARCHAR(500)`, err => {
-        console.log('ALTER TABLE count_gs', err)
-    })
-    db.run(`ALTER TABLE pgk ADD law_gs VARCHAR(500)`, err => {
-        console.log('ALTER TABLE law_gs', err)
-    })
-    /*/ 受理表
-     * no: '购物车流水号',
-     * area: '地区',
-     * addr: '渠道名称',
-     * acceptor: '受理人',
-     * product_name: '产品名称',
-     * product_type: '角色名称',
-     * product_main: '所属主销售品',
-     * action: '业务动作',
-     * action_no: '业务号码',
-     * created: '受理时间',
-     * status: '工单状态',
-     * date_end: '竣工时间',
-     * user: '揽收人',
-     * remark: '备注',
-     * import_date: '导入时间'
-     * js_count 结算次数,
-     * related_user: 用户关联账号，
-     */
-    db.run(
-        `CREATE TABLE accept(
+  /*/ 受理表
+   * no: '购物车流水号',
+   * area: '地区',
+   * addr: '渠道名称',
+   * acceptor: '受理人',
+   * product_name: '产品名称',
+   * product_type: '角色名称',
+   * product_main: '所属主销售品',
+   * action: '业务动作',
+   * action_no: '业务号码',
+   * created: '受理时间',
+   * status: '工单状态',
+   * date_end: '竣工时间',
+   * user: '揽收人',
+   * remark: '备注',
+   * import_date: '导入时间'
+   * js_count 结算次数,
+   * related_user: 用户关联账号，
+   */
+  db.run(
+    `CREATE TABLE accept(
       id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
       no VARCHAR(255),
       area VARCHAR(255),
@@ -72,55 +53,51 @@ db.serialize(() => {
       import_date VARCHAR(255),
       user_number VARCHAR(255)
   )`,
-        err => {
-            console.log(err)
-        }
-    )
+    err => {
+      console.log(err)
+    }
+  )
 
-    db.run('DROP INDEX `action_no` ON `accept`', (err, res) => {
-        console.log({ err, res })
-    })
+  db.run(`CREATE UNIQUE INDEX u_action_no ON accept (action_no,product_main)`, err => {
+    console.log(err)
+  })
+  db.run(`CREATE INDEX acc_pgk_id ON accept (pgk_id)`, err => {
+    console.log(err)
+  })
+  db.run(`CREATE INDEX acc_action ON accept (action)`, err => {
+    console.log(err)
+  })
+  db.run(`CREATE INDEX action_no_index ON accept (action_no)`, err => {
+    console.log(err)
+  })
+  db.run(`CREATE INDEX user_number ON accept (user_number)`, err => {
+    console.log(err)
+  })
+  db.run(`CREATE INDEX js_count ON accept (js_count)`, err => {
+    console.log(err)
+  })
+  db.run(`CREATE INDEX product_main ON accept (product_main)`, err => {
+    console.log(err)
+  })
+  db.run(`CREATE INDEX addr ON accept (addr)`, err => {
+    console.log(err)
+  })
 
-    db.run(`CREATE UNIQUE INDEX action_no ON accept (action_no,product_main)`, err => {
-        console.log(err)
-    })
-    db.run(`CREATE INDEX acc_pgk_id ON accept (pgk_id)`, err => {
-        console.log(err)
-    })
-    db.run(`CREATE INDEX acc_action ON accept (action)`, err => {
-        console.log(err)
-    })
-    db.run(`CREATE INDEX action_no ON accept (action_no)`, err => {
-        console.log(err)
-    })
-    db.run(`CREATE INDEX user_number ON accept (user_number)`, err => {
-        console.log(err)
-    })
-    db.run(`CREATE INDEX js_count ON accept (js_count)`, err => {
-        console.log(err)
-    })
-    db.run(`CREATE INDEX product_main ON accept (product_main)`, err => {
-        console.log(err)
-    })
-    db.run(`CREATE INDEX addr ON accept (addr)`, err => {
-        console.log(err)
-    })
+  /**
+   * 结算规则表 package
+   * name: 套餐名称
+   * count_js： 结算结算次数
+   * count_jf： 积分结算次数
+   * count_gs: 改数率结算次数
+   * law_gs:   改数率结算规律
+   * law_js:   结算清单结算规律
+   * law_jf:   积分结算规律
+   * law_desc: 结算规律说明
+   */
+  // db.run(`drop table package`)
 
-    /**
-     * 结算规则表 package
-     * name: 套餐名称
-     * count_js： 结算结算次数
-     * count_jf： 积分结算次数
-     * count_gs: 改数率结算次数
-     * law_gs:   改数率结算规律
-     * law_js:   结算清单结算规律
-     * law_jf:   积分结算规律
-     * law_desc: 结算规律说明
-     */
-    // db.run(`drop table package`)
-
-    db.run(
-        `CREATE TABLE pgk(
+  db.run(
+    `CREATE TABLE pgk(
      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
      name VARCHAR(200) NOT NULL,
      alias VARCHAR(500),
@@ -132,38 +109,38 @@ db.serialize(() => {
      law_jf VARCHAR(255) NOT NULL,
      law_desc VARCHAR(255)
     )`,
-        err => {
-            console.log(err && err.message)
-        }
-    )
+    err => {
+      console.log(err && err.message)
+    }
+  )
 
-    db.run(`CREATE UNIQUE INDEX package_name ON pgk (name)`, err => {
-        console.log(err)
-    })
+  db.run(`CREATE UNIQUE INDEX package_name ON pgk (name)`, err => {
+    console.log(err)
+  })
 
-    /**
-     * 结算表
-     * date: 账期
-     * order_id: 订单号
-     * complete_date: 竣工时间
-     * commission_policy: 佣金结算策略
-     * commission_type: 佣金结算类型
-     * commission_money: 佣金金额
-     * package_name: 套餐名称
-     * product_name: 产品名称
-     * user_id: 用户ID
-     * user_number: 用户号码
-     * status: 是否结算成功
-     * cause: 原因
-     * not_found_user: 没有找到业务ID
-     * branch: 网点
-     * branch_id: 网点ID
-     */
-    // db.run(`drop table bill`, err => {
-    //     console.log(err)
-    // })
-    db.run(
-        `create table bill(
+  /**
+   * 结算表
+   * date: 账期
+   * order_id: 订单号
+   * complete_date: 竣工时间
+   * commission_policy: 佣金结算策略
+   * commission_type: 佣金结算类型
+   * commission_money: 佣金金额
+   * package_name: 套餐名称
+   * product_name: 产品名称
+   * user_id: 用户ID
+   * user_number: 用户号码
+   * status: 是否结算成功
+   * cause: 原因
+   * not_found_user: 没有找到业务ID
+   * branch: 网点
+   * branch_id: 网点ID
+   */
+  // db.run(`drop table bill`, err => {
+  //     console.log(err)
+  // })
+  db.run(
+    `create table bill(
         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
         date varchar(200),
         order_id varchar(200),
@@ -183,53 +160,53 @@ db.serialize(() => {
         created varchar(200),
         branch_id varchar(100)
     )`,
-        err => {
-            console.log(err)
-        }
-    )
+    err => {
+      console.log(err)
+    }
+  )
 
-    // db.run('DROP INDEX `order_id` ON `bill`', (err, res) => {
-    //     console.log({ err, res })
-    // })
+  // db.run('DROP INDEX `order_id` ON `bill`', (err, res) => {
+  //     console.log({ err, res })
+  // })
 
-    // db.run(`CREATE UNIQUE INDEX order_id_status ON bill (order_id,status)`, err => {
-    //     console.log(err)
-    // })
+  // db.run(`CREATE UNIQUE INDEX order_id_status ON bill (order_id,status)`, err => {
+  //     console.log(err)
+  // })
 
-    db.run(`CREATE INDEX bill_pgk_id ON bill (pgk_id)`, err => {
-        console.log(err)
-    })
+  db.run(`CREATE INDEX bill_pgk_id ON bill (pgk_id)`, err => {
+    console.log(err)
+  })
 
-    db.run(`CREATE INDEX branch_id ON bill (branch_id)`, err => {
-        console.log(err)
-    })
-    db.run(`CREATE INDEX order_id ON bill (order_id)`, err => {
-        console.log(err)
-    })
-    db.run(`CREATE INDEX status ON bill (status)`, err => {
-        console.log(err)
-    })
-    db.run(`create index date ON bill (date)`, err => {
-        console.log(err)
-    })
+  db.run(`CREATE INDEX branch_id ON bill (branch_id)`, err => {
+    console.log(err)
+  })
+  db.run(`CREATE INDEX order_id ON bill (order_id)`, err => {
+    console.log(err)
+  })
+  db.run(`CREATE INDEX status ON bill (status)`, err => {
+    console.log(err)
+  })
+  db.run(`create index date ON bill (date)`, err => {
+    console.log(err)
+  })
 
-    db.run(`create index user_number ON bill (user_number)`, err => {
-        console.log(err)
-    })
-    db.run(`create index status ON bill (status)`, err => {
-        console.log(err)
-    })
-    db.run(`create index branch ON bill (branch)`, err => {
-        console.log(err)
-    })
-    db.run(`create index package_name ON bill (package_name)`, err => {
-        console.log(err)
-    })
-    db.run(`create index created ON bill (created)`, err => {
-        console.log(err)
-    })
+  db.run(`create index user_number ON bill (user_number)`, err => {
+    console.log(err)
+  })
+  db.run(`create index status ON bill (status)`, err => {
+    console.log(err)
+  })
+  db.run(`create index branch ON bill (branch)`, err => {
+    console.log(err)
+  })
+  db.run(`create index package_name ON bill (package_name)`, err => {
+    console.log(err)
+  })
+  db.run(`create index created ON bill (created)`, err => {
+    console.log(err)
+  })
 
-    /**
+  /**
      * 用户关联表
           a1: '业务号码',
           a2:'主卡',
@@ -240,8 +217,8 @@ db.serialize(() => {
      * @param  {[type]} err [description]
      * @return {[type]}     [description]
      */
-    db.run(
-        `create table related_user(
+  db.run(
+    `create table related_user(
         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
         a1 varchar(200) NOT NULL,
         a2 varchar(200),
@@ -250,19 +227,19 @@ db.serialize(() => {
         a5 varchar(200),
         a6 varchar(200)
     )`,
-        err => {
-            console.log(err)
-        }
-    )
+    err => {
+      console.log(err)
+    }
+  )
 
-    db.run(`create UNIQUE index a1 ON related_user (a1)`, err => {
-        console.log(err)
-    })
-    db.run(`create index a ON related_user (a2,a3,a4,a5,a6)`, err => {
-        console.log(err)
-    })
+  db.run(`create UNIQUE index a1 ON related_user (a1)`, err => {
+    console.log(err)
+  })
+  db.run(`create index a ON related_user (a2,a3,a4,a5,a6)`, err => {
+    console.log(err)
+  })
 
-    /**
+  /**
     date: varchar(200) NOT NULL, //'账期',
     local: '本地网',
     company: '县公司',
@@ -286,8 +263,8 @@ db.serialize(() => {
     qs: '清算',
     ydjf: '应兑换积分'
     */
-    db.run(
-        `CREATE TABLE IF NOT EXISTS jifen(
+  db.run(
+    `CREATE TABLE IF NOT EXISTS jifen(
         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
         date varchar(200) NOT NULL,
         local varchar(200),
@@ -314,40 +291,40 @@ db.serialize(() => {
         ydjf varchar(200),
         created_at varchar(200)
         )`,
-        err => {
-            console.log(err)
-        }
-    )
+    err => {
+      console.log(err)
+    }
+  )
 
-    db.run(`CREATE INDEX jifen_pgk_id ON jifen (pgk_id)`, err => {
-        console.log(err)
-    })
+  db.run(`CREATE INDEX jifen_pgk_id ON jifen (pgk_id)`, err => {
+    console.log(err)
+  })
 
-    db.run(`create index jifen_date ON related_user (date)`, err => {
-        console.log(err)
-    })
-    db.run(`create index jifen_user_member ON related_user (user_member)`, err => {
-        console.log(err)
-    })
-    db.run(`create index jifen_rw_name ON related_user (rw_name)`, err => {
-        console.log(err)
-    })
-    db.run(`create index jifen_xs_name ON related_user (xs_name)`, err => {
-        console.log(err)
-    })
-    db.run(`create index jifen_xs_instance_id ON related_user (xs_instance_id)`, err => {
-        console.log(err)
-    })
+  db.run(`create index jifen_date ON related_user (date)`, err => {
+    console.log(err)
+  })
+  db.run(`create index jifen_user_member ON related_user (user_member)`, err => {
+    console.log(err)
+  })
+  db.run(`create index jifen_rw_name ON related_user (rw_name)`, err => {
+    console.log(err)
+  })
+  db.run(`create index jifen_xs_name ON related_user (xs_name)`, err => {
+    console.log(err)
+  })
+  db.run(`create index jifen_xs_instance_id ON related_user (xs_instance_id)`, err => {
+    console.log(err)
+  })
 
-    /**
+  /**
      * 账期表
      * 储存每个受理清单的所有结算账期
      id(自增) | 受理清单ID(list_id) | 套餐ID(pgk_id) | 账期(date)  | 是否已结算(state) |  结算类型(type) |  结算清单ID(qd_id)
      --- | --- | --- | --- | --- | ---
      - | - | - | 202004 | 0:没有结算清单,1:结算成功, -1:结算失败 | 1:结算清单 2.积分清单 | 结算(积分) 清单ID
      */
-    db.run(
-        `CREATE TABLE IF NOT EXISTS zhangqi(
+  db.run(
+    `CREATE TABLE IF NOT EXISTS zhangqi(
         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
         list_id INTEGER NOT NULL,
         pgk_id INTEGER NOT NULL,
@@ -356,26 +333,26 @@ db.serialize(() => {
         state INTEGER DEFAULT 0,
         type INTEGER DEFAULT 1
         )`,
-        err => {
-            console.log(err)
-        }
-    )
+    err => {
+      console.log(err)
+    }
+  )
 
-    db.run(`create index zhangqi_list_id ON zhangqi (list_id)`, err => {
-        console.log(err)
-    })
+  db.run(`create index zhangqi_list_id ON zhangqi (list_id)`, err => {
+    console.log(err)
+  })
 
-    db.run(`create index zhangqi_pgk_id ON zhangqi (pgk_id)`, err => {
-        console.log(err)
-    })
+  db.run(`create index zhangqi_pgk_id ON zhangqi (pgk_id)`, err => {
+    console.log(err)
+  })
 
-    db.run(`create index zhangqi_date ON zhangqi (date)`, err => {
-        console.log(err)
-    })
+  db.run(`create index zhangqi_date ON zhangqi (date)`, err => {
+    console.log(err)
+  })
 
-    db.run(`create index zhangqi_state ON zhangqi (state)`, err => {
-        console.log(err)
-    })
+  db.run(`create index zhangqi_state ON zhangqi (state)`, err => {
+    console.log(err)
+  })
 })
 
 export default db

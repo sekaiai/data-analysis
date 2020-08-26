@@ -478,6 +478,7 @@ export default {
                 this.$db.all(sql, async (err, res = []) => {
                     for (var i = 0; i < res.length; i++) {
                         let v = res[i]
+                        console.log('onResetAllZhagnqi', v)
                         const x = await updateZhangqi(v.id)
                     }
                     this.allLoading = false
@@ -736,6 +737,7 @@ export default {
 
             this.$db.all(sql, (err, res) => {
                 console.log('fetchSlLists', res)
+                if (!res) return
                 const arr = {}
                 res.forEach(e => {
                     if (!arr[e.date]) {

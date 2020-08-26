@@ -162,7 +162,7 @@
                 <el-table-column prop="action_no" label="业务号码"> </el-table-column>
                 <el-table-column prop="product_main" label="所属主销售品"> </el-table-column>
                 <el-table-column prop="addr" label="渠道名称"> </el-table-column>
-                <el-table-column prop="js_count" label="已结算次数"> </el-table-column>
+                <!-- <el-table-column prop="js_count" label="已结算次数"> </el-table-column> -->
                 <el-table-column prop="status" label="工单状态"> </el-table-column>
                 <el-table-column prop="date_end" label="竣工时间">
                     <template slot-scope="scope">
@@ -330,16 +330,23 @@ export default {
                     }
                     this.deleteLoading = true
 
-                    const sql = `delete from accept ${where}`
-                    this.$db.run(sql, (err, res) => {
-                        this.deleteLoading = false
-                        this.$message({
-                            type: err ? 'error' : 'success',
-                            message: err ? '删除失败' : '数据已删除'
+                    // 1. 先删除对应账期
+                    const deltetZhangqiSQL = `delete from zhangqi where list_id in (select id from accept ${where})`
+                    this.$db.run(deltetZhangqiSQL, (err, res) => {
+                        console.log('deltetZhangqiSQL', deltetZhangqiSQL)
+
+                        // 删除账期数据
+                        const sql = `delete from accept ${where}`
+                        this.$db.run(sql, (err, res) => {
+                            this.deleteLoading = false
+                            this.$message({
+                                type: err ? 'error' : 'success',
+                                message: err ? '删除失败' : '数据已删除'
+                            })
+                            if (!err) {
+                                this.handleSearch()
+                            }
                         })
-                        if (!err) {
-                            this.handleSearch()
-                        }
                     })
                 })
                 .catch(err => {

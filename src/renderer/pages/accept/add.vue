@@ -50,7 +50,7 @@ const { readFileSync } = fs
 const customParseFormat = require('dayjs/plugin/customParseFormat')
 dayjs.extend(customParseFormat)
 
-import { SLinsertZhangqi } from '@/utils/zhangqi'
+import { SLinsertZhangqi, fetchTaocanItem2name } from '@/utils/zhangqi'
 
 export default {
     data() {
@@ -246,41 +246,61 @@ export default {
             this.logs.push(`[过滤完成]：<span>${path}</span>数据表，取得「改速率」和「新装」数据共${_datas.length}条`)
         },
         onEachInsert(keys, item) {
-            const vals = `'${item.join("','")}'`
-            const sql = `INSERT INTO accept (${keys}) VALUES (${vals})`
+            const acceptItem = {}
+            keys.split(',').forEach((e, i) => {
+                acceptItem[e] = item[i]
+            })
+
+            // 1. 先查询是否有相同的数据
+            // 2. 如果有相同的就判断业务动作 新装和改数率， 优先保留时间靠前和新装
+            let sql = `select * from accept where action_no='${acceptItem.action_no}' and product_name='${acceptItem.product_name}'`
 
             return new Promise(resolve => {
-                this.$db.run(sql, err => {
-                    if (err) {
-                        const values = {}
-                        keys.split(',').forEach((e, i) => {
-                            values[e] = item[i]
-                        })
+                this.$db.get(sql, async (err, res) => {
+                    console.log('查询的数据', err, res)
+                    if (res && res.id) {
+                        // 新装时间一定比改速率靠前
+                        const list_id = res.id
 
-                        // 根据插入失败原因，判断是否更新数据
-                        let ssql = `select id,no,created from accept where action_no = '${values.action_no}' and product_name='${values.product_name}'`
-                        this.$db.get(ssql, (err, res) => {
-                            // this.$logger({ res, err })
-                            if (res) {
-                                // 如果受理清单是新装则保留新装
-                                // 非新装取时间靠前的
-                                if ((values.action == '新装' && res.no !== values.no) || values.created < res.created) {
-                                    let dsql = `delete from accept where id = '${res.id}'`
-                                    this.$db.run(dsql, (err, res) => {
-                                        if (!err) {
-                                            this.$db.run(sql, (err, res) => {
-                                                // this.$logger('该插入成功', { err, res })
-                                            })
-                                        }
-                                        // this.$logger('删除数据', { err, res })
-                                    })
-                                } else {
-                                    // 不做处理
+                        if (acceptItem.action == '新装' || acceptItem.created < res.created) {
+                            let dsql = `delete from accept where id = '${list_id}'`
+                            this.$db.run(dsql, async (err, res) => {
+                                console.log('删除对应的受理清单', { err, res }) // 删除对应的账期
+                                this.$db.run(`delete from zhangqi where list_id=${list_id}`, (err, res) => {
+                                    console.log('删除对应的账期完成', err, res)
+                                })
+
+                                let taocan = await fetchTaocanItem2name(acceptItem.product_main)
+                                console.log({ taocan })
+                                if (taocan && taocan.id) {
+                                    acceptItem.pgk_id = taocan.id
                                 }
-                            }
+                                const vals = `'${Object.values(acceptItem).join("','")}'`
+                                const keys2 = `'${Object.keys(acceptItem).join("','")}'`
+                                const insertSQL = `INSERT INTO accept (${keys2}) VALUES (${vals})`
+
+                                this.$db.run(insertSQL, (err, res) => {
+                                    this.$logger('accept 更改数据插入完成', { err, res })
+                                    resolve(err)
+                                })
+                            })
+                        } else {
+                            resolve(null)
+                        }
+                    } else {
+                        let taocan = await fetchTaocanItem2name(acceptItem.product_main)
+                        if (taocan && taocan.id) {
+                            acceptItem.pgk_id = taocan.id
+                        }
+                        const vals = `'${Object.values(acceptItem).join("','")}'`
+                        const keys2 = `'${Object.keys(acceptItem).join("','")}'`
+                        const insertSQL = `INSERT INTO accept (${keys2}) VALUES (${vals})`
+
+                        this.$db.run(insertSQL, (err, res) => {
+                            this.$logger('accept 插入完成', { err, res })
+                            resolve(err)
                         })
                     }
-                    resolve(err)
                 })
             })
         },
@@ -298,7 +318,7 @@ export default {
             /**
             更新账期
             1. 查询出最大ID
-            2. 
+            2.
             **/
             let max_id = await new Promise(resolve => {
                 this.$db.get(`select id from accept order by id desc limit 1`, (err, res) => {
@@ -333,6 +353,7 @@ export default {
 
                 // if (i == 1) {
                 // this.$logger(now)
+                console.log(key, restitem)
 
                 let flag = await this.onEachInsert(key, restitem)
 
@@ -358,6 +379,7 @@ export default {
             this.onFetchMonthLength()
             SLinsertZhangqi(max_id).then(res => {
                 this.insertStatus = false
+                console.log('SLinsertZhangqixxxxxxxxx', res)
             })
         }
     }

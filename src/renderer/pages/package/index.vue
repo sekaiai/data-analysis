@@ -57,13 +57,21 @@
                     <el-table-column prop="law_gs" label="规律"> </el-table-column>
                 </el-table-column>
 
-                <el-table-column fixed="right" label="操作" width="120">
+                <el-table-column fixed="right" label="操作" width="160">
                     <template slot-scope="scope">
                         <el-button @click.native.prevent="deleteTaocan(scope.row.id)" type="text" size="small">
                             删除
                         </el-button>
                         <el-button @click.native.prevent="editTaocan(scope.row)" type="text" size="small">
                             修改
+                        </el-button>
+                        <el-button
+                            style="margin-left: 0"
+                            @click.native.prevent="openNoneDatas(scope.row)"
+                            type="text"
+                            size="small"
+                        >
+                            导出出错数据
                         </el-button>
                     </template>
                 </el-table-column>
@@ -134,6 +142,18 @@
                 </el-form-item>
             </el-form>
         </el-dialog>
+
+        <el-dialog title="选择账期" :visible.sync="dialogSelectDate">
+            <el-form>
+                <el-form-item label="活动区域" label-width="200">
+                    <el-date-picker v-model="zhangqiDate" type="month" placeholder="选择账期"> </el-date-picker>
+                </el-form-item>
+            </el-form>
+            <div slot="footer" class="dialog-footer">
+                <el-button @click="dialogFormVisible = false">取 消</el-button>
+                <el-button type="primary" @click="importNoneDatas">确 定</el-button>
+            </div>
+        </el-dialog>
     </div>
 </template>
 <script>
@@ -141,7 +161,8 @@ import dayjs from 'dayjs'
 const customParseFormat = require('dayjs/plugin/customParseFormat')
 
 dayjs.extend(customParseFormat)
-import { insertZhangqi, updateZhangqi, deleteZhangqi } from '@/utils/zhangqi'
+import { insertZhangqi, updateZhangqi, deleteZhangqi, importSLNoneJS, importJSNoneSL } from '@/utils/zhangqi'
+import download from '@/utils/download.js'
 
 export default {
     data() {
@@ -160,6 +181,9 @@ export default {
             }
         }
         return {
+            downloadNoneloading: false,
+            dialogSelectDate: false,
+            zhangqiDate: '',
             dateFormatArr: ['YYYY/M/D HH:mm:ss', 'YYYY-M-D HH:mm:ss'],
             loading: false,
             page: 1,
@@ -208,6 +232,54 @@ export default {
         }
     },
     methods: {
+        openNoneDatas(data) {
+            if (this.downloadNoneloading) {
+                return false
+            }
+            this.selectRow = data
+            this.dialogSelectDate = true
+            this.downloadNoneloading = true
+            this.zhangqiDate = ''
+        },
+        async importNoneDatas() {
+            let { id, name } = this.selectRow
+            /*            this.selectPGK_ID = row.id
+            this.selectRow = row
+            this.dialogSelectDate = true
+        },
+         importNoneDatasHelp() {
+            const id = this.selectPGK_ID*/
+            let date = false
+            if (this.zhangqiDate) {
+                date = dayjs(this.zhangqiDate).format('YYYYMM')
+                name += ' ' + date
+            }
+            console.log(id, name, date)
+
+            const sl = await importSLNoneJS(id, date)
+            const js = await importJSNoneSL(id, date)
+
+            const datas = [
+                { bookName: '结算清单-没有受理清单', datas: js },
+                { bookName: '受理清单-没有结算清单', datas: sl }
+            ]
+            console.log(datas)
+
+            download
+                .excel2(datas, name)
+                .then(res => {
+                    this.$message({
+                        showClose: true,
+                        message: `数据表格创建${!res ? '成功' : '失败'}`,
+                        type: !res ? 'success' : 'error'
+                    })
+                    this.downloadNoneloading = false
+                    this.dialogSelectDate = false
+                })
+                .catch(err => {
+                    console.log(err)
+                })
+        },
         formatAlias(alias) {
             return String(alias)
                 .split(/[\n,]/g)
