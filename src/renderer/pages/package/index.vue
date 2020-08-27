@@ -15,6 +15,9 @@
             套餐管理<el-button @click="isShowAddTaocan = true" style="margin-left: 10px;" type="text" size="mini">
                 添加规则
             </el-button>
+            <el-button @click="importTaocan" style="margin-left: 10px;" type="text" size="mini">
+                导入规则
+            </el-button>
         </div>
         <div class="table-box flex1">
             <el-table :data="datas" height="60vh">
@@ -158,7 +161,9 @@
 </template>
 <script>
 import dayjs from 'dayjs'
+import xlsx from 'xlsx'
 const customParseFormat = require('dayjs/plugin/customParseFormat')
+const fs = require('fs')
 
 dayjs.extend(customParseFormat)
 import { insertZhangqi, updateZhangqi, deleteZhangqi, importSLNoneJS, importJSNoneSL } from '@/utils/zhangqi'
@@ -193,12 +198,12 @@ export default {
             ruleForm: {
                 name: '', //名称
                 // begin: '', //开始结算月份
-                count_js: 0, //结算次数
-                law_js: '', //结算规律
+                count_js: 1, //结算次数
+                law_js: '1', //结算规律
                 count_jf: 0, //结算次数
-                law_jf: '', //结算规律
+                law_jf: '1', //结算规律
                 count_gs: 0, //结算次数
-                law_gs: 0, //结算次数
+                law_gs: 1, //结算次数
                 law_desc: '' //规律说明
             },
             rules: {
@@ -232,6 +237,95 @@ export default {
         }
     },
     methods: {
+        importTaocan(data) {
+            console.log(data)
+
+            let fileList = this.$electron.remote.dialog.showOpenDialog({
+                properties: ['openFile'],
+                filters: { name: 'xlsx', extensions: ['xlsx', 'xls'] }
+            })
+            console.log(fileList)
+
+            if (!fileList && !fileList[0]) {
+                this.$message({
+                    message: '没有获取到相关文件',
+                    type: 'error'
+                })
+                return
+            }
+            this.onOpenFile(fileList[0])
+        },
+        async onOpenFile(path, i) {
+            // 获取数据
+            const excelBuffer = fs.readFileSync(path)
+            let _this = this
+
+            // 解析数据
+            var result = xlsx.read(excelBuffer, {
+                type: 'buffer',
+                cellHTML: false
+            })
+
+            // 分析数据
+            const fun = []
+
+            const field = {
+                name: '套餐名',
+                alias: '套餐别名',
+                count_js: '结算次数',
+                law_js: '结算规律',
+                count_jf: '积分结算次数',
+                law_jf: '积分结算规律',
+                count_gs: '改数率结算次数',
+                law_gs: '改数率结算规律',
+                law_desc: '备注'
+            }
+            let key = result.SheetNames[0]
+
+            let json = xlsx.utils.sheet_to_json(result.Sheets[key])
+            let _field = { ...field }
+            console.log({ json })
+            const pgk_name = []
+            for (var i = 0; i < json.length; i++) {
+                let e = json[i]
+                for (let k in _field) {
+                    // console.log({ k, v: _field[k], e })
+                    let v = e[_field[k]]
+                    if (v === undefined && k === 'name') {
+                        continue
+                    }
+                    if (k === 'name') {
+                        pgk_name.push(v)
+                    }
+                    if (v === undefined && k !== 'law_desc' && k !== 'alias') {
+                        v = 0
+                    }
+                    if (k === 'law_js' || k === 'law_gs' || k === 'law_jf') {
+                        v = String(v).replace(/，/, ',')
+                    }
+
+                    field[k] = v
+                }
+                fun.push(field)
+                await new Promise(reslove => {
+                    const sql = `select id from pkg where name='${field.name}'`
+                    this.$db.get(sql, (err, res) => {
+                        console.log(i, res)
+                        const id = (res && res.id) || false
+                        this.addTaocan2(field, id)
+                        reslove()
+                    })
+                })
+            }
+
+            /*       // 查找已存在的
+            const sql = `select id, name from pkg where name in ('${pgk_name.join("','")}')`
+            const hasd = new Promise(reslove => {
+                this.$db.all(sql, (err, res = []) => {
+                    reslove(res)
+                })
+            })*/
+        },
         openNoneDatas(data) {
             if (this.downloadNoneloading) {
                 return false
@@ -349,11 +443,16 @@ export default {
             })
         },
         addTaocan() {
+            const data = this.ruleForm
+            const id = this.isedit
+            this.addTaocan2(data, id)
+        },
+        addTaocan2(__datas, __ID) {
             let sql = ''
-            if (this.isedit) {
+            if (__ID) {
                 let params = []
-                for (let k in this.ruleForm) {
-                    let v = this.ruleForm[k]
+                for (let k in __datas) {
+                    let v = __datas[k]
                     if (k === 'name') {
                         v = v.toString().trim()
                     }
@@ -363,10 +462,10 @@ export default {
                 }
                 params = params.join(',')
                 console.log('params', params)
-                sql = `update pgk set ${params} where id=${this.isedit}`
+                sql = `update pgk set ${params} where id=${__ID}`
             } else {
-                const keys = Object.keys(this.ruleForm)
-                const values = Object.values(this.ruleForm).join(`','`)
+                const keys = Object.keys(__datas)
+                const values = Object.values(__datas).join(`','`)
                 sql = `INSERT INTO pgk (${keys}) VALUES ('${values}')`
             }
             this.loading = true
@@ -377,10 +476,10 @@ export default {
 
                     this.$message({
                         type: 'error',
-                        message: err.message
+                        message: '改套餐已存在'
                     })
                 } else {
-                    if (!this.isedit) {
+                    if (!__ID) {
                         this.$db.get(`select last_insert_rowid() as id from pgk`, (err, res) => {
                             updateZhangqi(res.id).then(res => {
                                 this.loading = false
@@ -388,7 +487,7 @@ export default {
                             })
                         })
                     } else {
-                        updateZhangqi(this.isedit).then(res => {
+                        updateZhangqi(__ID).then(res => {
                             this.fetchDatas()
                             this.loading = false
                         })
