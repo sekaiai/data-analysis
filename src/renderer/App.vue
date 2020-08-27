@@ -9,6 +9,14 @@
                 <i class="el-icon-document"></i>
                 <span slot="title">受理清单</span>
             </el-menu-item>
+            <el-menu-item index="6" :route="{ name: 'bill.list' }">
+                <i class="el-icon-document"></i>
+                <span slot="title">结算清单</span>
+            </el-menu-item>
+            <el-menu-item index="7" :route="{ name: 'bill.jifen' }">
+                <i class="el-icon-document"></i>
+                <span slot="title">积分清单</span>
+            </el-menu-item>
             <el-menu-item index="3" :route="{ name: 'package' }">
                 <i class="el-icon-s-cooperation"></i>
                 <span slot="title">套餐管理</span>

@@ -425,7 +425,7 @@ const insertZhangqi = async (taocan, accepts) => {
                     let date_js = dayjs(date)
                         .add(law_js[i], 'month')
                         .format('YYYYMM')
-
+                    /*
                     console.log(
                         '-------------------------------1',
                         accepts[i].no,
@@ -435,7 +435,7 @@ const insertZhangqi = async (taocan, accepts) => {
                         `add:${law_js[i]}`,
                         `date_end: ${date_end}`
                     )
-
+*/
                     promiseArr.push(insertZhangqiItem(accept_id, id, date_js, 1))
                 }
 
