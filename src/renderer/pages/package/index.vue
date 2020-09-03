@@ -1,5 +1,6 @@
 <template>
     <div id="pgk" v-loading.lock="loading">
+        <!-- <div @click="computedZhangqiState2()">computedZhangqiState2</div> -->
         <div class="title-line" v-if="product_mains.length">
             未添加套餐<el-button @click="fetchDatas" style="margin-left: 10px;" type="text" size="mini">
                 刷新数据
@@ -17,6 +18,9 @@
             </el-button>
             <el-button @click="importTaocan" style="margin-left: 10px;" type="text" size="mini">
                 导入规则
+            </el-button>
+            <el-button @click="deleteAllTaocan" style="margin-left: 10px;" type="text" size="mini">
+                删除全部套餐
             </el-button>
         </div>
         <div class="table-box flex1">
@@ -166,8 +170,16 @@ const customParseFormat = require('dayjs/plugin/customParseFormat')
 const fs = require('fs')
 
 dayjs.extend(customParseFormat)
-import { insertZhangqi, updateZhangqi, deleteZhangqi, importSLNoneJS, importJSNoneSL } from '@/utils/zhangqi'
+import {
+    insertZhangqi,
+    TCupdateZQ,
+    deleteZhangqi,
+    importSLNoneJS,
+    importJSNoneSL,
+    computedZhangqiState2
+} from '@/utils/zhangqi'
 import download from '@/utils/download.js'
+import { v4 as uuidv4 } from 'uuid'
 
 export default {
     data() {
@@ -237,6 +249,7 @@ export default {
         }
     },
     methods: {
+        computedZhangqiState2,
         importTaocan(data) {
             console.log(data)
 
@@ -246,11 +259,7 @@ export default {
             })
             console.log(fileList)
 
-            if (!fileList && !fileList[0]) {
-                this.$message({
-                    message: '没有获取到相关文件',
-                    type: 'error'
-                })
+            if (!fileList || !fileList[0]) {
                 return
             }
             this.onOpenFile(fileList[0])
@@ -287,6 +296,7 @@ export default {
             console.log({ json })
             const pgk_name = []
             for (var i = 0; i < json.length; i++) {
+                let obj = {}
                 let e = json[i]
                 for (let k in _field) {
                     // console.log({ k, v: _field[k], e })
@@ -304,19 +314,25 @@ export default {
                         v = String(v).replace(/，/, ',')
                     }
 
-                    field[k] = v
+                    obj[k] = v || ''
                 }
-                fun.push(field)
                 await new Promise(reslove => {
-                    const sql = `select id from pkg where name='${field.name}'`
+                    const sql = `select id from pkg where name='${obj.name}'`
                     this.$db.get(sql, (err, res) => {
-                        console.log(i, res)
-                        const id = (res && res.id) || false
-                        this.addTaocan2(field, id)
+                        if (res && res.id) {
+                            obj.id = res.id
+                        }
+                        fun.push(obj)
                         reslove()
                     })
                 })
             }
+            console.log(fun)
+            for (var i = 0; i < fun.length; i++) {
+                await this.addTaocan2(fun[i], fun[i].id)
+            }
+            // this.addTaocan2(field, id)
+            // pgk_name
 
             /*       // 查找已存在的
             const sql = `select id, name from pkg where name in ('${pgk_name.join("','")}')`
@@ -354,10 +370,10 @@ export default {
             const js = await importJSNoneSL(id, date)
 
             const datas = [
-                { bookName: '结算清单-没有受理清单', datas: js },
-                { bookName: '受理清单-没有结算清单', datas: sl }
+                { bookName: '结算清单（未受理）', datas: js },
+                { bookName: '受理清单（未结算）', datas: sl }
             ]
-            console.log(datas)
+            // console.log(datas)
 
             download
                 .excel2(datas, name)
@@ -448,56 +464,54 @@ export default {
             this.addTaocan2(data, id)
         },
         addTaocan2(__datas, __ID) {
-            let sql = ''
-            if (__ID) {
-                let params = []
-                for (let k in __datas) {
-                    let v = __datas[k]
-                    if (k === 'name') {
-                        v = v.toString().trim()
+            return new Promise(reslove => {
+                let sql = ''
+                let isedit = !!__ID
+                if (__ID) {
+                    // 如果存在就更新
+                    let params = []
+                    for (let k in __datas) {
+                        let v = __datas[k]
+                        if (k === 'name') {
+                            v = v.toString().trim()
+                        }
+                        if (k !== 'accept_count' && k !== 'yjs') {
+                            params.push(`${k}='${v}'`)
+                        }
                     }
-                    if (k !== 'accept_count' && k !== 'yjs') {
-                        params.push(`${k}='${v}'`)
-                    }
-                }
-                params = params.join(',')
-                console.log('params', params)
-                sql = `update pgk set ${params} where id=${__ID}`
-            } else {
-                const keys = Object.keys(__datas)
-                const values = Object.values(__datas).join(`','`)
-                sql = `INSERT INTO pgk (${keys}) VALUES ('${values}')`
-            }
-            this.loading = true
-            this.$db.run(sql, (err, res) => {
-                if (err) {
-                    console.log('addTaocan', err)
-                    this.loading = false
-
-                    this.$message({
-                        type: 'error',
-                        message: '改套餐已存在'
-                    })
+                    params = params.join(',')
+                    console.log('params', params)
+                    sql = `update pgk set ${params} where id='${__ID}'`
                 } else {
-                    if (!__ID) {
-                        this.$db.get(`select last_insert_rowid() as id from pgk`, (err, res) => {
-                            updateZhangqi(res.id).then(res => {
-                                this.loading = false
-                                this.fetchDatas()
-                            })
-                        })
-                    } else {
-                        updateZhangqi(__ID).then(res => {
-                            this.fetchDatas()
-                            this.loading = false
-                        })
-                    }
-
-                    this.isShowAddTaocan = false
-
-                    // 更新账期数据
+                    // 不存在，创建新套餐
+                    __ID = uuidv4()
+                    __datas.id = __ID
+                    const keys = Object.keys(__datas)
+                    const values = Object.values(__datas).join(`','`)
+                    sql = `INSERT INTO pgk (${keys}) VALUES ('${values}')`
+                    console.log(sql, keys)
                 }
-                console.log(err)
+                this.loading = true
+                this.$db.run(sql, async (err, res) => {
+                    if (err) {
+                        console.log('addTaocan', err)
+                        this.loading = false
+
+                        this.$message({
+                            type: 'error',
+                            message: '改套餐已存在'
+                        })
+                        reslove()
+                    } else {
+                        await TCupdateZQ(__ID, isedit)
+                        this.fetchDatas()
+                        this.loading = false
+                        this.isShowAddTaocan = false
+                        reslove()
+                        // 更新账期数据
+                    }
+                    console.log('addTaocan2', err)
+                })
             })
         },
 
@@ -508,24 +522,27 @@ export default {
          * 3. 根据结算清单和积分清单 重新统计账期
          * id => 套餐id
          */
-        updateZhangqi(id) {
-            console.log('updateZhangqi')
-            // todo: 计算 结算清单和积分清单
-
-            // updateZhangqi(id).then(res => {
-            //     console.log('fakdjflkadf',res)
-            // })
-            const x = updateZhangqi(id).then(res => {
-                this.loading = false
-            })
-            console.log('xxxxxxxxxxxxxxxxx', x)
-        },
 
         // 重置form内容
         resetForm(formName) {
             this.$refs[formName].resetFields()
         },
-
+        deleteAllTaocan() {
+            this.$confirm('确定要删除该套餐吗？', '提示', {
+                confirmButtonText: '确定',
+                cancelButtonText: '取消',
+                type: 'warning'
+            }).then(() => {
+                this.$db.all(`select id from pgk`, async (err, res = []) => {
+                    console.log('select id from pgk', res)
+                    for (var i = 0; i < res.length; i++) {
+                        await deleteZhangqi(res[i].id)
+                    }
+                    this.$db.run(`delete from pgk`, (err, res) => {})
+                    this.fetchDatas()
+                })
+            })
+        },
         // 删除套餐，id: 套餐ID
         deleteTaocan(id) {
             this.$confirm('确定要删除该套餐吗？', '提示', {
@@ -534,9 +551,10 @@ export default {
                 type: 'warning'
             })
                 .then(() => {
+                    console.log(id)
                     // const { id } = this.datas[index]
-                    const sql = `delete from pgk where id = ${id}`
-                    this.$db.run(sql, (err, res) => {
+                    const sql = `delete from pgk where id =?`
+                    this.$db.run(sql, id, (err, res) => {
                         console.log(err, res)
 
                         this.$message({

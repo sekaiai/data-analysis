@@ -1,6 +1,6 @@
 <template>
     <div id="home-add" v-loading.lock="loading" element-loading-text="正在解析数据">
-        <div @click="testParseDate">车市testParseDate</div>
+        <div @click="updateAllData">删除重复</div>
         <div class="title-line shrink0">导入受理清单</div>
         <div style="margin-bottom: 20px">本月已导入{{ monthLength }}条数据</div>
         <div class="form-line">
@@ -20,10 +20,10 @@
             </div>
         </template>
         <div class="form-line" style="margin-top: 20px" v-if="datas.length">
-            <el-button :loading="insertStatus" type="success" @click="handleInsertData">
-                开始写入数据库
+            <el-button :loading="insertStatus" type="success" @click="insertAccept">
+                {{ btntext }}
             </el-button>
-            <div style="margin-top: 20px;">
+            <div style="margin-top: 20px;" v-if="false">
                 <div>
                     写入成功 ({{ success.length }})条
                     <el-button v-if="!insertStatus" type="text" @click="handleAnalysisDownload(`success`)"
@@ -50,11 +50,24 @@ const { readFileSync } = fs
 const customParseFormat = require('dayjs/plugin/customParseFormat')
 dayjs.extend(customParseFormat)
 
-import { SLinsertZhangqi, fetchTaocanItem2name } from '@/utils/zhangqi'
+import {
+    SLinsertZhangqi,
+    fetchTaocanItem2name,
+    getAllTaocan,
+    getAllFuka,
+    createZhangqiSQL,
+    createAcceptSQL,
+    runSql2Arr,
+    updateAllData,
+    deleteReplaceData,
+    computedZhangqiState2
+} from '@/utils/zhangqi'
+import { v4 as uuidv4 } from 'uuid'
 
 export default {
     data() {
         return {
+            btntext: '开始写入数据库',
             errorDate: [],
             dateFormatArr: ['YYYY/M/D HH:mm:ss', 'YYYY-M-D HH:mm:ss'],
             monthLength: 0,
@@ -71,6 +84,9 @@ export default {
             page: 1, //当前页
             showItem: ['购物车流水号', '地区', '渠道名称', '受理人', '产品名称', '所属主销售品', '业务号码', '揽收人'],
             items: {
+                uuid: 'uuid',
+                pgk_id: 'pgk_id',
+                action_r: 'action_r',
                 no: '购物车流水号',
                 area: '地区',
                 addr: '渠道名称',
@@ -115,16 +131,7 @@ export default {
         this.onFetchMonthLength()
     },
     methods: {
-        testParseDate() {
-            let d1 = '2020/5/3 13:55:21'
-            let d2 = '2020/5/3 14:03:13'
-            let d3 = '2020/5/4 17:28:39'
-
-            var x = ['YYYY/M/D HH:mm:ss', 'YYYY-M-D HH:mm:ss']
-            d1 = dayjs(d1, this.dateFormatArr).unix()
-            d2 = dayjs(d2, x).format('YYYY-MM-DD HH:mm:ss')
-            d3 = dayjs(d3, x).format('YYYY-MM-DD HH:mm:ss')
-        },
+        updateAllData,
         // 本月已导入数据
         onFetchMonthLength() {
             const firstDay = dayjs()
@@ -145,9 +152,6 @@ export default {
                     // this.dataListTotalCount = res.totalCount;
                 }
             })
-        },
-        handleCurrentChange(page) {
-            this.page = page
         },
         handleAnalysisDownload(type) {
             // const type = this.analysisActiveName
@@ -191,10 +195,8 @@ export default {
             }
             this.loading = true
             setTimeout(() => {
-                this.$logger('loading', this.loading)
                 this.logs.push(`选取${fileList.length}张数据表, 开始解析`)
 
-                this.$logger(fileList)
                 fileList.forEach((e, i) => {
                     try {
                         this.onOpenFile(e, i)
@@ -251,9 +253,11 @@ export default {
             keys.split(',').forEach((e, i) => {
                 acceptItem[e] = item[i]
             })
+            // select * from accept  GROUP by action_no,product_main,action order by date_end asc,action asc
 
             // 1. 先查询是否有相同的数据
             // 2. 如果有相同的就判断业务动作 新装和改数率， 优先保留时间靠前和新装
+
             let sql = `select * from accept where action_no='${acceptItem.action_no}' and product_name='${acceptItem.product_name}'`
 
             return new Promise(resolve => {
@@ -305,6 +309,140 @@ export default {
                 })
             })
         },
+        async insertAccept() {
+            // return false
+
+            if (this.insertStatus) return
+            this.insertStatus = true
+            const now = dayjs().unix()
+
+            const key = Object.keys(this.items)
+            const values = Object.values(this.items)
+            let arr = []
+            const taocanArr = await getAllTaocan()
+            console.log(taocanArr)
+            const taocanList = []
+            const fukaArr = await getAllFuka()
+            console.log(fukaArr)
+            const zqArr = [] //账期sql arr
+            const pgk_ids = new Set()
+            console.log(taocanArr, fukaArr)
+
+            for (var i = this.datas.length - 1; i >= 0; i--) {
+                let item = this.datas[i]
+                let uuid = uuidv4()
+
+                let restItem = values.map(e => {
+                    let v = item[e]
+
+                    if (e === '竣工时间' || e === '受理时间') {
+                        if (!v) {
+                            v = item['受理时间']
+                        }
+                        // excel的时间格式是number
+                        if (typeof v === 'number') {
+                            v = new Date((v - 25569) * 86400 * 1000)
+                        }
+
+                        v = dayjs(v).unix()
+                        return isNaN(v) ? 0 : v
+                    } else if (e === '导入时间') {
+                        return now
+                    } else if (e === 'uuid') {
+                        return uuid
+                    } else if (e === 'pgk_id') {
+                        let pgk_id = 0
+                        let t = taocanArr.find(t2 => {
+                            // console.log(t2.val, item['所属主销售品'])
+                            return t2.val.indexOf(`#${item['所属主销售品']}`) > -1
+                        })
+                        if (t) {
+                            pgk_id = t.id
+                            pgk_ids.add(t.id)
+
+                            let date = item['竣工时间'] || item['受理时间']
+                            if (typeof date === 'number') {
+                                date = new Date((date - 25569) * 86400 * 1000)
+                                date = dayjs(date).unix()
+                                // console.log('number date', date, dayjs.unix(date).format('YYYYMM'))
+                            }
+
+                            let a = {
+                                date_end: date,
+                                uuid,
+                                action: item['业务动作']
+                            }
+
+                            zqArr.push(...createZhangqiSQL(t, a))
+                        }
+                        return pgk_id
+                    } else if (e === 'action_r') {
+                        let _ac = `#${item['业务号码']}#`
+
+                        let _t = fukaArr.find(tt => {
+                            return tt.indexOf(_ac) > -1
+                        })
+                        // console.log('ac,t', _ac, _t)
+                        if (_t) _ac = _t
+
+                        return _ac
+                    } else {
+                        return item[e] || ''
+                    }
+                })
+                arr.push(restItem)
+            }
+            // console.log('arr1', arr, key)
+
+            // 生成插入受理清单sql
+            arr = createAcceptSQL(key, arr)
+            // console.log('arr2', arr)
+            // runSql2Arr(arr)
+            runSql2Arr([...arr, ...zqArr]).then(res => {
+                console.log('runSql2Arr over', res)
+                this.btntext = '正在查找重复数据'
+                this.$notify.info({
+                    title: '受理清单导入完成！',
+                    message: '开始查找重复数据。'
+                })
+                deleteReplaceData().then(res => {
+                    console.log('重复数据删除完成')
+                    this.btntext = '正在更新账期信息'
+                    this.onFetchMonthLength()
+
+                    this.$notify.info({
+                        title: '重复数据删除完成！',
+                        message: '开始更新账期信息。'
+                    })
+
+                    // 开始更新账期
+                    computedZhangqiState2(Array.from(pgk_ids)).then(res => {
+                        this.insertStatus = false
+                        this.btntext = '写入完成'
+                        this.$notify.success({
+                            title: '完成',
+                            message: '账期更新完毕，所有操作结束！'
+                        })
+                    })
+                })
+
+                /*         runSql2Arr(zqArr).then(res => {
+                    console.log('添加账期完成', res)
+
+                    
+                })*/
+            })
+
+            // console.log('zqArr', zqArr)
+
+            // 批量插入数据
+
+            /*      this.onFetchMonthLength()
+            SLinsertZhangqi(max_id).then(res => {
+                this.insertStatus = false
+                console.log('SLinsertZhangqixxxxxxxxx', res)
+            })*/
+        },
         async handleInsertData(e) {
             // return false
 
@@ -341,6 +479,7 @@ export default {
                         // excel的时间格式是number
                         if (typeof date === 'number') {
                             date = new Date((date - 25569) * 86400 * 1000)
+                            // console.log(date)
                         }
 
                         date = dayjs(date).unix()
@@ -354,7 +493,7 @@ export default {
 
                 // if (i == 1) {
                 // this.$logger(now)
-                console.log(key, restitem)
+                // console.log(key, restitem)
 
                 let flag = await this.onEachInsert(key, restitem)
 
@@ -380,7 +519,7 @@ export default {
             this.onFetchMonthLength()
             SLinsertZhangqi(max_id).then(res => {
                 this.insertStatus = false
-                console.log('SLinsertZhangqixxxxxxxxx', res)
+                // console.log('SLinsertZhangqixxxxxxxxx', res)
             })
         }
     }

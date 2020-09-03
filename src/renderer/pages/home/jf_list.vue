@@ -223,7 +223,7 @@ export default {
                     this.$db.all(delSql, (err, res) => {
                         if (res.length) {
                             let ids = res.map(e => e.id)
-                            let sql = `delete from jifen where id in (${ids.join(',')})`
+                            let sql = `delete from jifen where id in ('${ids.join("','")}')`
 
                             this.$db.run(sql, (err, res) => {
                                 if (!err) {

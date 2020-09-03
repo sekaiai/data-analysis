@@ -10,14 +10,22 @@
         <div>
             <div class="title-line">
                 受理清单
-                <el-popconfirm title="不建议使用。 如果数据出错，可以执行这个。" @onConfirm="onResetAllZhagnqi">
+                <!-- onResetAllZhagnqi -->
+                <el-popconfirm title="不建议使用。 如果数据出错，可以执行这个。" @onConfirm="updateAllData">
                     <el-button :loading="allLoading" type="text" size="mini" slot="reference">重新统计</el-button>
                 </el-popconfirm>
             </div>
             <!-- 添加一个总结 -->
             <el-table :data="slLists" border style="width: 100%;" max-height="280">
                 <el-table-column prop="date" label="账期"> </el-table-column>
-
+                <!--                 <el-table-column prop="ap" label="受理清单数量"> </el-table-column>
+                <el-table-column prop="tc" label="套餐数量"> </el-table-column>
+                <el-table-column prop="tc_none" label="未绑定套餐"> </el-table-column>
+                <el-table-column prop="zq_count" label="需结算账期"> </el-table-column>
+                <el-table-column prop="zq_suss" label="已结算(成功)"> </el-table-column>
+                <el-table-column prop="zq_fail" label="已结算(失败)"> </el-table-column>
+                <el-table-column prop="zq_none" label="未结算"> </el-table-column>
+ -->
                 <el-table-column label="总计">
                     <el-table-column label="总清单" width="80">
                         <template slot-scope="scope"> {{ scope.row.count ? scope.row.count + '条' : '-' }}</template>
@@ -116,16 +124,16 @@
                     <template slot-scope="scope"> {{ (scope.row.success | 0) + (scope.row.fail | 0) }}条 </template>
                 </el-table-column>
                 <el-table-column prop="success" label="结算成功">
-                    <template slot-scope="scope"> {{ scope.row.success }}条 </template>
+                    <template slot-scope="scope"> {{ scope.row.success || 0 }}条 </template>
                 </el-table-column>
                 <el-table-column prop="success" label="结算成功(金额)">
-                    <template slot-scope="scope"> ≈{{ scope.row.success_money }}元 </template>
+                    <template slot-scope="scope"> ≈{{ scope.row.success_money || 0 }}元 </template>
                 </el-table-column>
                 <el-table-column prop="fail" label="结算失败">
-                    <template slot-scope="scope"> {{ scope.row.fail }}条 </template>
+                    <template slot-scope="scope"> {{ scope.row.fail || 0 }}条 </template>
                 </el-table-column>
                 <el-table-column prop="fail" label="结算失败(金额)">
-                    <template slot-scope="scope"> ≈{{ scope.row.fail_money }}元 </template>
+                    <template slot-scope="scope"> ≈{{ scope.row.fail_money || 0 }}元 </template>
                 </el-table-column>
                 <el-table-column label="操作">
                     <template slot-scope="scope">
@@ -283,13 +291,23 @@ const rp = require('request-promise')
 const tough = require('tough-cookie')
 var Cookie = tough.Cookie
 const cheerio = require('cheerio')
+import { v4 as uuidv4 } from 'uuid'
 
-import { updateZhangqiJifenState, updateZhangqi } from '@/utils/zhangqi'
+import {
+    updateZhangqiJifenState,
+    updateZhangqi,
+    getAllTaocan,
+    runSql2Arr,
+    computedZhangqiState2,
+    updateAllData,
+    sqlAll
+} from '@/utils/zhangqi'
 
 export default {
     name: 'bill',
     data() {
         return {
+            slqdlist: [],
             downSlListLoading: false, //
             importJsLoading: false, //导入清单
             allLoading: false,
@@ -379,6 +397,7 @@ export default {
                 remark: '备注'
             },
             columns: {
+                pgk_id: 'pgk_id',
                 date: '账期',
                 order_id: '订单号',
                 complete_date: '订单竣工时间',
@@ -397,6 +416,7 @@ export default {
             insertJifenCount: 0,
             insertJFError: [],
             jifenColumns: {
+                pgk_id: 'pgk_id',
                 date: '账期',
                 local: '本地网',
                 company: '县公司',
@@ -460,6 +480,7 @@ export default {
         this.onInit()
     },
     methods: {
+        updateAllData,
         formatDay(date) {
             return dayjs.unix(date).format('YYYY-MM-DD HH:mm:ss')
         },
@@ -469,10 +490,12 @@ export default {
             this.fetchJfLists()
             this.fetchSlLists()
         },
+        // 重新统计所有数据
         onResetAllZhagnqi() {
             // 1.查询出所有套餐
             this.allLoading = true
-            this.$db.run(`delete from zhangqi`, (err, res) => {
+
+            /*this.$db.run(`delete from zhangqi`, (err, res) => {
                 const sql = `select id from pgk `
 
                 this.$db.all(sql, async (err, res = []) => {
@@ -484,11 +507,52 @@ export default {
                     this.allLoading = false
                     this.onInit()
                 })
-            })
+            })*/
 
             // 2. 更新账期 computedZhangqiState
         },
         async downloadSlList(date) {
+            this.downSlListLoading = true
+            let zq_where = true
+            let bi_where = true
+            let ji_where = true
+            if (date !== '总计') {
+                zq_where = `zq.date=${date}`
+                bi_where = `b.date=${date}`
+                ji_where = `j.date=${date}`
+            }
+
+            let sql = [
+                `select zq.date,zq.type as zq_type,zq.state as zq_state,a.* from zhangqi zq left join accept a on zq.list_id=a.uuid where ${zq_where}`,
+                `select b.*,zq.state,zq.type as zq_type from bill b left join zhangqi zq on b.id=zq.qd_id where ${bi_where}`,
+                `select j.*,zq.type as zq_type, zq.state as zq_state from jifen j left join zhangqi zq on zq.qd_id=j.id where ${ji_where}`
+            ]
+            console.log(sql)
+            this.$db.serialize(() => {
+                this.$db.run('BEGIN TRANSACTION;')
+
+                sql = sql.map(e => {
+                    return new Promise(resolve => {
+                        this.$db.all(e, (err, res = []) => {
+                            resolve(res)
+                        })
+                    })
+                })
+
+                Promise.all(sql).then(([zhangqi, js_list, jf_list]) => {
+                    this.$db.run('COMMIT TRANSACTION;')
+                    console.log('数据请求完成', Date.now(), zhangqi.length, js_list.length, jf_list.length, js_list)
+                    // 组装数据
+                    zhangqi = this.formatAllDatas(zhangqi)
+                    js_list = this.formatJsList(js_list)
+                    jf_list = this.formatJFList(jf_list)
+                    this.onDownload([...zhangqi, ...js_list, ...jf_list], `${date}受理清单结算信息`)
+
+                    this.downSlListLoading = false
+                })
+            })
+        },
+        async downloadSlList2(date) {
             // 下载受理清单
             this.downSlListLoading = true
 
@@ -496,16 +560,42 @@ export default {
 
             let sql = [
                 // 账期受理清单
-                `select zq.type as zq_type,zq.list_id, zq.state as zq_state,a.* from zhangqi zq left join accept a on zq.list_id=a.id where ${where}`,
+                `select zq.type as zq_type,zq.list_id, zq.state as zq_state,a.* from zhangqi zq left join accept a on zq.list_id=a.uuid where ${where}`,
 
                 // 结算清单
-                `select zq.type as zq_type, zq.state as zq_state,a.*,b.date as b_date,b.branch as b_branch,b.commission_money as b_money,b.order_id as b_order_id,b.user_number as b_user_member from zhangqi zq left join accept a on zq.list_id=a.id left join bill b on b.id = zq.qd_id where ${where} and zq.type=1`,
-                `select zq.type as zq_type, zq.state as zq_state,a.*,b.date as b_date,b.branch as b_branch,b.commission_money as b_money,b.order_id as b_order_id,b.user_number as b_user_member from zhangqi zq left join accept a on zq.list_id=a.id left join bill b on b.id = zq.qd_id where ${where} and zq.type=3`,
+                `select zq.type as zq_type, zq.state as zq_state,a.*,b.date as b_date,b.branch as b_branch,b.commission_money as b_money,b.order_id as b_order_id,b.user_number as b_user_member from zhangqi zq left join accept a on zq.list_id=a.uuid left join bill b on b.id = zq.qd_id where ${where} and zq.type=1`,
+                `select zq.type as zq_type, zq.state as zq_state,a.*,b.date as b_date,b.branch as b_branch,b.commission_money as b_money,b.order_id as b_order_id,b.user_number as b_user_member from zhangqi zq left join accept a on zq.list_id=a.uuid left join bill b on b.id = zq.qd_id where ${where} and zq.type=3`,
                 // 积分清单
-                `select zq.type as zq_type, zq.state as zq_state,zq.date as zq_date,a.*,j.* from zhangqi zq left join accept a on zq.list_id=a.id left join jifen j on j.id = zq.qd_id where ${where} and zq.type=2`
+                `select zq.type as zq_type, zq.state as zq_state,zq.date as zq_date,a.*,j.* from zhangqi zq left join accept a on zq.list_id=a.uuid left join jifen j on j.id = zq.qd_id where ${where} and zq.type=2`
             ]
+            console.log(sql)
 
-            // 账期受理清单
+            this.$db.serialize(() => {
+                this.$db.run('BEGIN TRANSACTION;')
+
+                sql = sql.map(e => {
+                    return new Promise(resolve => {
+                        this.$db.all(e, (err, res = []) => {
+                            resolve(res)
+                        })
+                    })
+                })
+
+                Promise.all(sql).then(([all, js_list, gs_list, jf_list]) => {
+                    this.$db.run('COMMIT TRANSACTION;')
+                    console.log('数据请求完成', Date.now())
+                    // 组装数据
+                    all = this.formatAllDatas(all)
+                    js_list = this.formatJsList(js_list)
+                    jf_list = this.formatJFList(jf_list)
+                    gs_list = this.formatJsList(gs_list, '改速率')
+
+                    // 下载
+                    this.onDownload([all, ...js_list, ...jf_list, ...gs_list], `${date}受理清单结算信息`)
+                    this.downSlListLoading = false
+                })
+            })
+            /*            // 账期受理清单
             sql = sql.map(e => {
                 return new Promise(resolve => {
                     this.$db.all(e, (err, res = []) => {
@@ -515,31 +605,17 @@ export default {
             })
 
             Promise.all(sql).then(([all, js_list, gs_list, jf_list]) => {
-                // 组装数据
-                all = this.formatAllDatas(all)
-                js_list = this.formatJsList(js_list)
-                jf_list = this.formatJFList(jf_list)
-                gs_list = this.formatJsList(gs_list, '改速率')
-
-                // 下载
-                this.onDownload([all, ...js_list, ...jf_list, ...gs_list], `${date}受理清单结算信息`)
-                this.downSlListLoading = false
-            })
+                console.log('数据请求完成')
+ 
+            })*/
         },
         formatJFList(jf_list) {
             let suss = [],
-                none = []
+                none = [],
+                fail = []
 
             let json = {
-                b_user_member: '结算号码',
-                ...this.notfoundItems,
-                zq_state: '结算状态', //0:没有结算清单,1:结算成功, -1:结算失败
-                hyjh: '合约计划',
-                jf_jiesuan: '结算积分',
-                bqdh: '本期兑换',
-                qs: '清算',
-                ydjf: '应兑换积分',
-                zq_date: '账期'
+                ...this.jifenColumns
             }
 
             jf_list.forEach(e => {
@@ -547,54 +623,51 @@ export default {
                 e.created = dayjs.unix(e.created).format('YYYY-MM-DD')
 
                 if (e.zq_state == 1) {
-                    e.zq_state = '已结算'
                     suss.push(e)
+                } else if (e.zq_state == -1) {
+                    fail.push(e)
                 } else {
-                    e.zq_state = '未结算'
                     none.push(e)
                 }
             })
 
             suss = this.parseAoaData(suss, json)
             none = this.parseAoaData(none, json)
+            fail = this.parseAoaData(fail, json)
             return [
-                { datas: suss, bookName: '积分清单(成功)' },
-                { datas: none, bookName: '积分清单(没有结算清单)' }
+                { datas: suss, bookName: '积分结算(成功)' },
+                { datas: fail, bookName: '积分结算(失败)' },
+                { datas: none, bookName: '积分结算(未结算)' }
             ]
         },
         // 导出结算清单
-        formatJsList(js_list, actionType) {
+        formatJsList(js_list = []) {
             let suss = [],
                 fail = [],
                 none = [],
                 all = []
 
             let json = {
-                b_date: '账期',
-                b_user_member: '结算号码',
-                ...this.notfoundItems,
-                zq_state: '结算状态', //0:没有结算清单,1:结算成功, -1:结算失败
-                b_branch: '网点名称',
-                b_money: '佣金金额',
-                b_order_id: '结算清单ID'
+                zq_type: '结算类型',
+                ...this.columns
             }
 
             js_list.forEach(e => {
-                e.date_end = dayjs.unix(e.date_end).format('YYYY-MM-DD')
-                e.created = dayjs.unix(e.created).format('YYYY-MM-DD')
+                // e.date_end = dayjs.unix(e.date_end).format('YYYY-MM-DD')
+                // e.created = dayjs.unix(e.created).format('YYYY-MM-DD')
                 // e.import_date = dayjs.unix(e.import_date).format('YYYY-MM-DD')
-
+                e.status = e.status == 1 ? '结算成功' : '结算失败'
+                e.zq_type = e.zq_type == 1 ? '结算清单' : '改速率'
                 // e.state = e.zq_state == -1 ? '结算失败' : e.zq_state == 1 ? '结算成功' : '没有结算信息'
-                if (e.zq_state == 1) {
+                if (e.state == 1) {
                     suss.push(e)
-                    e.zq_state = '结算成功'
                 } else if (e.zq_state == -1) {
                     fail.push(e)
-                    e.zq_state = '结算失败'
-                } else {
-                    none.push(e)
-                    e.zq_state = '没有结算信息'
                 }
+                if (e.flag != 1) {
+                    none.push(e)
+                }
+
                 all.push(e)
             })
             all = this.parseAoaData(all, json)
@@ -602,31 +675,100 @@ export default {
             fail = this.parseAoaData(fail, json)
             none = this.parseAoaData(none, json)
             return [
-                { datas: all, bookName: `全部${actionType ? '改速率' : '结算'}清单` },
-                { datas: suss, bookName: `${actionType ? '改速率' : '结算'}清单(成功)` },
-                { datas: fail, bookName: `${actionType ? '改速率' : '结算'}清单(失败)` },
-                { datas: none, bookName: `${actionType ? '改速率' : '结算'}清单(没有结算清单)` }
+                { datas: all, bookName: `全部结算清单` },
+                { datas: suss, bookName: `清单(成功)` },
+                { datas: fail, bookName: `清单(失败)` },
+                { datas: none, bookName: `清单(未结算)` }
             ]
         },
         formatAllDatas(all) {
             // 账期 门店工号 门店名称 销售人员 用户ID 套餐名称 业务动作 业务号码 结算号码 揽收人
             let json = {
-                ...this.notfoundItems,
-                user_number: '结算号码',
-                zq_type: '结算类型', // 1:结算清单 2.积分清单
-                zq_state: '结算状态' //0:没有结算清单,1:结算成功, -1:结算失败
+                date: '账期',
+                type: '账期类型',
+                action_r: '副卡信息',
+                ...this.notfoundItems
+                // zq_type: '结算类型', // 1:结算清单 2.积分清单
+                // zq_state: '结算状态' //0:没有结算清单,1:结算成功, -1:结算失败
             }
-            all = all.map(e => {
-                e.zq_type = e.zq_type == 2 ? '积分结算' : '结算清单'
-                e.zq_state = e.zq_state == -1 ? '结算失败' : e.zq_state == 1 ? '结算成功' : '没有结算信息'
+
+            let jf = []
+            let jf_suss = []
+            let jf_fail = []
+            let jf_none = []
+
+            let js = []
+            let js_suss = []
+            let js_fail = []
+            let js_none = []
+
+            let result = []
+
+            all.forEach(e => {
+                // e.zq_type = e.zq_type == 2 ? '积分结算' : '结算清单'
+                // e.zq_state = e.zq_state == -1 ? '结算失败' : e.zq_state == 1 ? '结算成功' : '没有结算信息'
                 e.created = dayjs.unix(e.created).format('YYYY-MM-DD HH:mm:ss')
                 e.date_end = dayjs.unix(e.date_end).format('YYYY-MM-DD HH:mm:ss')
 
-                return e
+                if (e.zq_type == 2) {
+                    e.type = '积分清单'
+                    jf.push(e)
+                    if (e.zq_state == -1) {
+                        jf_fail.push(e)
+                    } else if (e.zq_state == 1) {
+                        jf_suss.push(e)
+                    } else {
+                        jf_none.push(e)
+                    }
+                } else {
+                    e.type = '结算清单'
+                    js.push(e)
+                    if (e.zq_state == -1) {
+                        js_fail.push(e)
+                    } else if (e.zq_state == 1) {
+                        js_suss.push(e)
+                    } else {
+                        js_none.push(e)
+                    }
+                }
             })
 
-            let datas = this.parseAoaData(all, json)
-            return { datas, bookName: '受理清单' }
+            jf = {
+                datas: this.parseAoaData(jf, json),
+                bookName: '全部积分账期'
+            }
+
+            jf_suss = {
+                datas: this.parseAoaData(jf_suss, json),
+                bookName: '积分（成功）'
+            }
+            jf_fail = {
+                datas: this.parseAoaData(jf_fail, json),
+                bookName: '积分（失败）'
+            }
+            jf_none = {
+                datas: this.parseAoaData(jf_none, json),
+                bookName: '积分（未结算）'
+            }
+
+            js = {
+                datas: this.parseAoaData(js, json),
+                bookName: '全部结算账期'
+            }
+            js_suss = {
+                datas: this.parseAoaData(js_suss, json),
+                bookName: '结算（成功）'
+            }
+            js_fail = {
+                datas: this.parseAoaData(js_fail, json),
+                bookName: '结算（失败）'
+            }
+            js_none = {
+                datas: this.parseAoaData(js_none, json),
+                bookName: '结算（未结算）'
+            }
+
+            return [js, js_suss, js_fail, js_none, jf, jf_suss, jf_fail, jf_none]
         },
         fetchSlListsAll() {
             // 查找所有未结算的
@@ -716,12 +858,83 @@ export default {
                 })
             })
         },
-        // 获取受理清单
-        fetchSlLists() {
+        async fetchSlLists2() {
             console.log('fetchSlLists')
             // 账期  需结算 结算成功    结算失败    没有结算清单  积分清单    没有积分清单  操作
 
+            let result = {}
             const max = dayjs().format('YYYYMM')
+            // 获取所有清单，判断清单是否有清单ID
+            const slsql = `select pgk_id,created,date_end from accept`
+            const aps = await sqlAll(slsql)
+
+            const zqsql = `select state,date from zhangqi where date <= ?`
+            const zq = await sqlAll(zqsql, max)
+            console.log(aps, zq)
+            for (let i = 0; i < aps.length; i++) {
+                let { date_end, pgk_id, created } = aps[i]
+                let date = date_end || created
+                date = dayjs.unix(date).format('YYYYMM')
+                if (!result[date]) {
+                    result[date] = {
+                        ap: 0,
+                        tc: new Set(),
+                        tc_none: 0,
+                        zq_count: 0,
+                        zq_suss: 0,
+                        zq_fail: 0,
+                        zq_none: 0
+                    }
+                }
+                result[date].ap++
+                if (pgk_id) {
+                    result[date].tc.add(pgk_id)
+                } else {
+                    result[date].tc_none++
+                }
+            }
+
+            for (var i = 0; i < zq.length; i++) {
+                let { date, state } = zq[i]
+                if (!result[date]) {
+                    result[date] = {
+                        ap: 0,
+                        tc: new Set(),
+                        tc_none: 0,
+                        zq_count: 0,
+                        zq_suss: 0,
+                        zq_fail: 0,
+                        zq_none: 0
+                    }
+                }
+
+                result[date].zq_count++
+                if (state == 0) {
+                    result[date].zq_none++
+                } else if (state == -1) {
+                    result[date].zq_fail++
+                } else {
+                    result[date].zq_suss++
+                }
+            }
+            console.log(result)
+            let arr2 = []
+            for (let x in result) {
+                let x2 = result[x]
+                x2.date = x
+                console.log('x2.tc', x2.tc)
+                x2.tc = Array.from(x2.tc).filter(e => e && e != 0).length
+                arr2.push(x2)
+            }
+            this.slqdlist = arr2
+            return false
+
+            let notTC = []
+            let hasTC = []
+            for (var i = 0; i < aps.length; i++) {
+                let { pgk_id, created, date_end } = aps[i]
+                let date = created || date_end
+            }
             /*const min = dayjs()
                 .subtract(3, 'month')
                 .format('YYYYMM')*/
@@ -729,7 +942,7 @@ export default {
                 .map(e => {
                     return [1, 2, 3]
                         .map(e2 => {
-                            return `select count(*) as count,date,state,type from zhangqi where date < ${max} and state=${e} and type=${e2} group by date  `
+                            return `select count(*) as count,date,state,type from zhangqi where date < ${max} and state=${e} and type=${e2} group by date`
                         })
                         .join(' union all ')
                 })
@@ -775,6 +988,97 @@ export default {
                             arr[e.date].jf_none += e.count
                         }
                     } else if (e.type == 3) {
+                        if (e.state == 1) {
+                            arr[e.date].gs_success += e.count
+                            arr[e.date].success += e.count
+                        } else if (e.state == -1) {
+                            arr[e.date].fail += e.count
+                            arr[e.date].gs_fail += e.count
+                        } else {
+                            arr[e.date].none += e.count
+                            arr[e.date].gs_none += e.count
+                        }
+                    }
+                })
+                this.fetchSlListsAll().then(res => {
+                    let lists = Object.values(arr).sort((a, b) => b.date - a.date)
+                    lists.unshift(res)
+                    this.slLists = lists
+                })
+            })
+        },
+        // 获取受理清单
+        fetchSlLists() {
+            console.log('fetchSlLists')
+            // 账期  需结算 结算成功    结算失败    没有结算清单  积分清单    没有积分清单  操作
+
+            const max = dayjs().format('YYYYMM')
+            /*const min = dayjs()
+                .subtract(3, 'month')
+                .format('YYYYMM')*/
+            const sql = [0, 1, -1]
+                .map(e => {
+                    return [1, 2, 3]
+                        .map(e2 => {
+                            return `select count(*) as count,date,state,type from zhangqi where date < ${max} and state=${e} and type=${e2} group by date  `
+                        })
+                        .join(' union all ')
+                })
+                .join(' union all ')
+
+            this.$db.all(sql, (err, res) => {
+                console.log('fetchSlLists', res)
+                if (!res) return
+                const arr = {}
+                res.forEach(e => {
+                    if (!arr[e.date]) {
+                        arr[e.date] = {
+                            count: 0,
+                            success: 0,
+                            fail: 0,
+                            none: 0,
+                            date: e.date,
+                            jf_count: 0,
+                            jf_none: 0,
+                            jf_success: 0,
+                            jf_fail: 0,
+                            js_count: 0,
+                            js_none: 0,
+                            js_fail: 0,
+                            js_success: 0,
+                            gs_count: 0,
+                            gs_success: 0,
+                            gs_fail: 0,
+                            gs_none: 0
+                        }
+                    }
+
+                    arr[e.date].count += e.count
+
+                    if (e.type == 1) {
+                        arr[e.date].js_count += e.count
+                        if (e.state == 1) {
+                            arr[e.date].success += e.count
+                            arr[e.date].js_success += e.count
+                        } else if (e.state == -1) {
+                            arr[e.date].fail += e.count
+                            arr[e.date].js_fail += e.count
+                        } else {
+                            arr[e.date].none += e.count
+                            arr[e.date].js_none += e.count
+                        }
+                    } else if (e.type == 2) {
+                        arr[e.date].jf_count += e.count
+                        if (e.state == 1) {
+                            arr[e.date].success += e.count
+                            arr[e.date].jf_success += e.count
+                        } else {
+                            arr[e.date].none += e.count
+                            arr[e.date].jf_none += e.count
+                        }
+                    } else if (e.type == 3) {
+                        arr[e.date].gs_count += e.count
+
                         if (e.state == 1) {
                             arr[e.date].gs_success += e.count
                             arr[e.date].success += e.count
@@ -881,15 +1185,31 @@ export default {
             this.loadingJifen = true
 
             this.tableNum = fileList
+            const taocanArr = await getAllTaocan()
+
+            let sqlArr = []
+            let tcArr = []
 
             for (var i = 0; i < fileList.length; i++) {
-                await this.openJfExcel(fileList[i], i)
+                let { jf_sql, tc_ids } = this.openJfExcel(fileList[i], taocanArr)
+                console.log({ jf_sql, tc_ids })
+                sqlArr.push(...jf_sql)
+                tcArr.push(...tc_ids)
             }
-            this.loadingJifen = false
-            this.onInit()
+
+            // 写入数据
+            runSql2Arr(sqlArr).then(res => {
+                tcArr = Array.from(tcArr)
+                console.log({ tcArr })
+
+                computedZhangqiState2(tcArr)
+
+                this.loadingJifen = false
+                this.onInit()
+            })
         },
 
-        async openJfExcel(path, i) {
+        openJfExcel(path, taocanArr) {
             // 获取数据
             const excelBuffer = fs.readFileSync(path)
 
@@ -904,52 +1224,63 @@ export default {
 
             // 分析数据
             const _data = []
-            const fun = []
+            const jf_sql = []
+            const tc_ids = new Set()
+
             // let keys = Object.keys(this.jifenColumns).join(',')
             // 先获取最大的积分清单的ID
 
-            const last_jf_id = await this.fetchLastId('jifen')
+            // const last_jf_id = await this.fetchLastId('jifen')
             result.SheetNames.forEach(key => {
                 let json = xlsx.utils.sheet_to_json(result.Sheets[key])
 
                 json.forEach(e => {
+                    let id = uuidv4()
                     if (e['入网套餐'] && (e['账期'] || e['帐期'])) {
                         let obj = {
+                            id,
+                            pgk_id: 0,
                             created_at: now
                         }
                         for (let k in this.jifenColumns) {
                             let v = this.jifenColumns[k]
-                            if (k === 'date') {
+                            if (k === 'ydjf') {
+                                obj.ydjf = e['应兑换积分'] || e['本月兑换金额']
+                            } else if (k === 'pgk_id') {
+                                let t = taocanArr.find(t2 => {
+                                    console.log(t2, e['入网套餐'])
+                                    return t2.val.indexOf(`#${e['入网套餐']}#`) > -1
+                                })
+                                if (t) {
+                                    obj.pgk_id = t.id
+                                    tc_ids.add(t.id)
+                                }
+                            } else if (k === 'date') {
                                 obj.date = e['账期'] || e['帐期']
                             } else if (k === 'rw_date') {
-                                // 2020/5/2 12:38:54 YYYY/M/D H:DD:MM YYYY/MM/DD HH:DD:MM
-                                // 2020-06-13 18:38:05 YYYY-MM-DD HH:DD:MM
                                 obj.rw_date = dayjs(e[v]).unix()
                             } else {
                                 obj[k] = e[v]
                             }
                         }
 
-                        fun.push(this.insertJifen(obj))
+                        jf_sql.push(this.insertJifenSQL(obj))
                     }
                 })
             })
-            return new Promise(resolve => {
-                if (fun.length) {
-                    Promise.all(fun).then(async res => {
-                        await updateZhangqiJifenState(last_jf_id, 'jifen')
-                        resolve(true)
-                    })
-                } else {
-                    resolve(false)
-                }
-            })
 
-            // this.datas = _data
-            // this.handleParseLose()
+            return { jf_sql, tc_ids }
         },
-        insertJifen(datas) {
-            return new Promise(resolve => {
+        insertJifenSQL(datas) {
+            let keys = Object.keys(datas).join(',')
+            let values = Object.values(datas).join(`','`)
+
+            // 插入数据库
+            const sql = `insert into jifen (${keys}) values ('${values}')`
+
+            return sql
+
+            /*          return new Promise(resolve => {
                 let keys = Object.keys(datas).join(',')
                 let values = Object.values(datas).join(`','`)
 
@@ -967,7 +1298,7 @@ export default {
                     }
                     resolve(err)
                 })
-            })
+            })*/
         },
         // 先获取所有网点
         fetchWangdian() {
@@ -1121,7 +1452,7 @@ export default {
             let datas = this.fetchDatas
             const now = dayjs().unix()
             this.$logger('datas.length', datas.length)
-            datas.forEach(e => {
+            let js_sql = datas.map(e => {
                 // 受理日期： e[7]
 
                 let _datas = {
@@ -1137,7 +1468,9 @@ export default {
                     user_number: e[2], // '用户号码',
                     status: e[0], //'是否成功结算',
                     // cause: '原因',
-                    branch: e[14]
+                    branch: e[14],
+                    created: now,
+                    id: uuidv4()
                 }
 
                 // let keys = Object.keys(datas).join(',')
@@ -1145,7 +1478,12 @@ export default {
                 // // 插入数据库
                 // const sql = `insert into bill (${keys}) values ('${values}')`
 
-                this.onInsertDatas(_datas, now)
+                return insertJsSQL(_datas)
+            })
+
+            runSql2Arr(js_sql).then(res => {
+                console.log('runSql2Arr over', res)
+                // 更新账期
             })
         },
         async handleRequestDatasHelp() {
@@ -2025,6 +2363,7 @@ export default {
             this.$logger('onChange', e)
         },
         async importJsLists() {
+            this.importJsLoading = true
             let fileList = this.$electron.remote.dialog.showOpenDialog({
                 properties: ['openFile', 'multiSelections'],
                 filters: { name: 'xlsx', extensions: ['xlsx', 'xls'] }
@@ -2035,17 +2374,33 @@ export default {
                     message: '没有获取到相关文件',
                     type: 'error'
                 })
+                this.importJsLoading = false
                 return
             }
-            this.importJsLoading = true
-
+            const taocanArr = await getAllTaocan()
             this.tableNum = fileList
+            let sqlArr = []
+            let tcArr = []
 
             for (var i = 0; i < fileList.length; i++) {
-                await this.onOpenFile(fileList[i], i)
+                let { js_sql, tc_ids } = this.onOpenFile(fileList[i], taocanArr)
+                console.log({ js_sql, tc_ids })
+                sqlArr.push(...js_sql)
+                tcArr.push(...tc_ids)
             }
-            this.importJsLoading = false
-            this.onInit()
+
+            runSql2Arr(sqlArr).then(res => {
+                console.log('runSql2Arr over', res, { tcArr })
+                tcArr = Array.from(tcArr)
+                console.log({ tcArr })
+
+                computedZhangqiState2(tcArr)
+
+                this.importJsLoading = false
+                this.onInit()
+                // 更新账期
+            })
+
             // this.loading = false
         },
         onParseSuccess(key) {
@@ -2059,7 +2414,7 @@ export default {
                 this.$logger({ json })
             }
         },
-        async onOpenFile(path, i) {
+        onOpenFile(path, taocanArr) {
             // 获取数据
             const excelBuffer = fs.readFileSync(path)
             let _this = this
@@ -2072,20 +2427,34 @@ export default {
 
             // this.result = result
             const now = dayjs().unix()
-            const last_js_id = await this.fetchLastId('jifen')
+
+            const js_sql = []
+            // const taocanArr = await getAllTaocan()
+            const tc_ids = new Set()
 
             // 分析数据
-            const fun = []
             result.SheetNames.forEach(key => {
                 let json = xlsx.utils.sheet_to_json(result.Sheets[key])
 
                 json.forEach(e => {
                     // this.$logger(e)
                     if (e['发展套餐名'] || e['账期'] || e['帐期']) {
-                        let obj = {}
+                        let obj = {
+                            id: uuidv4(),
+                            created: now
+                        }
                         for (let k in this.columns) {
                             let v = this.columns[k]
-                            if (k === 'date') {
+                            if (k === 'pgk_id') {
+                                let t = taocanArr.find(t2 => {
+                                    console.log(t2, e['发展套餐名'])
+                                    return t2.val.indexOf(`#${e['发展套餐名']}#`) > -1
+                                })
+                                if (t) {
+                                    obj.pgk_id = t.id
+                                    tc_ids.add(t.id)
+                                }
+                            } else if (k === 'date') {
                                 obj.date = e['账期'] || e['帐期']
                             } else if (v === '是否成功结算') {
                                 let flag = (e[v] === '成功') * 1
@@ -2099,71 +2468,26 @@ export default {
                                 obj[k] = e[v]
                             }
                         }
-                        fun.push(this.onInsertDatas(obj, now))
+                        js_sql.push(this.insertJsSQL(obj))
                     }
                 })
             })
 
-            return new Promise(resolve => {
-                if (fun.length) {
-                    Promise.all(fun).then(res => {
-                        updateZhangqiJifenState(last_js_id, 'bill')
-                        resolve(true)
-                    })
-                } else {
-                    resolve(true)
-                }
-            })
+            return { js_sql, tc_ids }
+
+            /*return runSql2Arr(js_sql).then(res => {
+                console.log('runSql2Arr over', res)
+                // 更新账期
+            })*/
         },
         // 插入结算清单
-        onInsertDatas(datas, now) {
-            return new Promise(resolve => {
-                datas.created = now
-                let keys = Object.keys(datas).join(',')
-                let values = Object.values(datas).join(`','`)
-                // 插入数据库
-                const sql = `insert into bill (${keys}) values ('${values}')`
-                // this.$logger(sql)
-                this.$db.run(sql, err => {
-                    if (err) {
-                        this.$logger('插入数据错误', err)
-                        datas.error = err.toString()
-                        this.insertError.push(datas)
-                    } else {
-                        this.insertSuccessCount++
-                        /*
-                        // 更新acceptjs_count
-                        const id = datas.user_number
-                        const sql = `update accept set js_count=js_count+1 where action_no='${id}' or user_number='${id}'`
-                        this.$db.run(sql, err => {
-                            if (err) {
-                                this.$logger(id, '更新js_count失败')
-                                // 判断数据是否在副卡中
-                                const sql2 = `select a1 from related_user where a2='${id}' or a3='${id}' or a4='${id}' or a5='${id}' or a6='${id}'`
-                                this.$db.get(sql2, (err, res) => {
-                                    this.$logger(id, '查找副卡', res, err)
-
-                                    if (err) {
-                                        // 不在副卡中就标记为未找到受理用户
-                                        this.onNotFoundUserMember(datas)
-                                    } else {
-                                        // 找到就更新结算条数, js_count
-                                        const sql = `update accept set js_count=js_count+1, user_number='${id}' where action_no='${res.a1}'`
-                                        this.$logger('添加绑定副卡', res, sql)
-                                        this.$db.run(sql, err => {
-                                            // this.$logger(err)
-                                            if (err) {
-                                                this.onNotFoundUserMember(datas)
-                                            }
-                                        })
-                                    }
-                                })
-                            }
-                        })*/
-                    }
-                    resolve(err)
-                })
-            })
+        insertJsSQL(datas) {
+            let keys = Object.keys(datas).join(',')
+            let values = Object.values(datas).join(`','`)
+            // 插入数据库
+            const sql = `insert into bill (${keys}) values ('${values}')`
+            // this.$logger(sql)
+            return sql
         },
         onNotFoundUserMember(datas) {
             // this.notFoundUserMember.push(datas)
@@ -2175,7 +2499,7 @@ export default {
         handleParseLose() {
             let user = this.datas.map(e => e['user_number']).join(`','`)
             user = `'${user}'`
-            this.$logger({ user })
+            // this.$logger({ user })
             // 1.获取所有数据，然后再从user中未找到accept中不存在的数据
 
             // 查询未找到的数据

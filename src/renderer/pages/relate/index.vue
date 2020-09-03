@@ -43,6 +43,7 @@
 <script>
 import fs from 'fs'
 import xlsx from 'xlsx'
+import { runSql2Arr, runSql2, getAllFuka } from '@/utils/zhangqi'
 
 export default {
   data() {
@@ -148,6 +149,8 @@ export default {
       let keys = Object.keys(this.colums).join(',')
       let values = Object.values(this.colums)
 
+      let sqlArr = []
+
       for (var i = _datas.length - 1; i >= 0; i--) {
         let e = _datas[i]
         // _datas = _datas.forEach(e => {
@@ -155,7 +158,10 @@ export default {
           let vals = values.map(k => e[k]).join(`','`)
           // this.$logger(vals)
           const sql = `REPLACE INTO related_user (${keys}) values ('${vals}')`
-          await new Promise(reslove => {
+          sqlArr.push(sql)
+          this.countSuccess++
+
+          /*await new Promise(reslove => {
             this.$db.run(sql, (err, res) => {
               // this.$logger({ err, res })
               if (!err) {
@@ -165,18 +171,59 @@ export default {
               }
               reslove()
             })
-          })
+          })*/
         }
         // })
       }
-      this.loading = false
-      this.onInit()
-      this.$notify({
-        title: '提示',
-        message: `写入成功${this.countSuccess}, 写入失败${this.countError}`
+      runSql2Arr(sqlArr).then(res => {
+        this.loading = false
+        this.onInit()
+        this.$notify({
+          title: '提示',
+          message: `写入成功${this.countSuccess}, 写入失败${this.countError}`
+        })
+        this.updateRelation()
       })
-      // this.$logger(_datas)
-      // this.datas.push(..._datas)
+
+      // 1. 查询出所有受理清单
+
+      // 2. 更新匹配的受理清单
+    },
+    async updateRelation() {
+      const fks = await getAllFuka()
+
+      await new Promise(reslove => {
+        this.$db.serialize(async () => {
+          this.$db.run('BEGIN TRANSACTION;')
+
+          let arr = []
+          const aps = await new Promise(reslove => {
+            this.$db.all(`select uuid, action_no from accept`, (err, res = []) => {
+              reslove(res)
+            })
+          })
+          console.log(fks, aps)
+
+          aps.forEach(e => {
+            let _ac = `#${e['action_no']}#`
+
+            let _t = fks.find(tt => {
+              return tt.indexOf(_ac) > -1
+            })
+
+            if (_t) {
+              arr.push(runSql2(`update accept set action_r=? where uuid=?`, [_t, e.uuid]))
+            }
+          })
+          console.log({ arr: arr.length, arr2: arr })
+
+          Promise.all(arr).then(res => {
+            this.$db.run('COMMIT TRANSACTION;')
+            console.log(61, Date.now())
+            reslove()
+          })
+        })
+      })
     }
   }
 }

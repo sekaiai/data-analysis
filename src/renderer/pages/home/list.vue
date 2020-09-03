@@ -199,12 +199,13 @@ export default {
                 .then(() => {
                     let where = this.onParseSearchSQL()
                     // 先查询出所有需要删除的ID
+
                     let delSql = `select id from bill b where ${where}`
                     this.$db.all(delSql, (err, res) => {
                         if (res.length) {
                             let ids = res.map(e => e.id)
 
-                            let sql = `delete from bill where id in (${ids.join(',')})`
+                            let sql = `delete from bill where id in ('${ids.join("','")}')`
 
                             this.$db.run(sql, (err, res) => {
                                 if (!err) {

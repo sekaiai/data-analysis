@@ -190,6 +190,7 @@
 import download from '@/utils/download.js'
 import dayjs from 'dayjs'
 import xlsx from 'xlsx'
+import { deleteZhangqi2accept } from '@/utils/zhangqi'
 const fs = require('fs')
 const { readFileSync } = fs
 
@@ -310,6 +311,9 @@ export default {
             if (!this.product_names.length) this.remoteMethod('product_name')
         },
         handleDeleteDatas() {
+            if (this.deleteLoading) {
+                return
+            }
             this.$confirm(
                 '删除前先点查询确认下是否是要删除的数据，该操作会删除所选条件下的所有数据且不可恢复。',
                 '提示',
@@ -325,27 +329,20 @@ export default {
                         where = 'where true'
                     }
 
-                    if (this.deleteLoading) {
-                        return
-                    }
                     this.deleteLoading = true
 
                     // 1. 先删除对应账期
-                    const deltetZhangqiSQL = `delete from zhangqi where list_id in (select id from accept ${where})`
-                    this.$db.run(deltetZhangqiSQL, (err, res) => {
-                        console.log('deltetZhangqiSQL', deltetZhangqiSQL)
-
-                        // 删除账期数据
-                        const sql = `delete from accept ${where}`
-                        this.$db.run(sql, (err, res) => {
-                            this.deleteLoading = false
+                    const deltetZhangqiSQL = `select uuid from accept ${where}`
+                    this.$db.all(deltetZhangqiSQL, (err, ids = []) => {
+                        console.log('deltetZhangqiSQL', ids)
+                        deleteZhangqi2accept(ids).then(res => {
                             this.$message({
-                                type: err ? 'error' : 'success',
-                                message: err ? '删除失败' : '数据已删除'
+                                type: 'success',
+                                message: '数据已删除'
                             })
-                            if (!err) {
-                                this.handleSearch()
-                            }
+
+                            this.handleSearch()
+                            this.deleteLoading = false
                         })
                     })
                 })
@@ -516,7 +513,7 @@ export default {
             })
         },
         onFetchCount(whereSQL = '') {
-            const sql = 'SELECT COUNT(id) AS totalCount from accept ' + whereSQL
+            const sql = 'SELECT COUNT(uuid) AS totalCount from accept ' + whereSQL
             this.$db.get(sql, (err, res) => {
                 if (!err) {
                     this.total = res.totalCount

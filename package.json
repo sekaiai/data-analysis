@@ -81,7 +81,8 @@
     "cheerio": "^1.0.0-rc.3",
     "request": "^2.88.2",
     "request-promise": "^4.2.6",
-    "sqlite3": "^4.0.1"
+    "sqlite3": "^4.0.1",
+    "uuid": "^8.3.0"
   },
   "devDependencies": {
     "axios": "^0.16.1",

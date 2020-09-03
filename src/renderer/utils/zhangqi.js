@@ -1,17 +1,175 @@
 import dayjs from 'dayjs'
 import DB from './db'
 
-const computedZhangqiState2 = async pgk_id => {
-    ;`SELECT zq.*,j.date as j_date,b.date as b_date,a.product_main, b.package_name,b.id as b_id,a.id as a_id,j.id as j_id from zhangqi zq 
+const updateAllData = async () => {
+    // 2. 更新套餐信息
+    // 2.1 获取所有套餐
+    /*    await new Promise(reslove => {
+        DB.all()
+    })*/
+    const ids = await new Promise(reslove => {
+        sqlAll('select id from pgk').then((res = []) => {
+            const id = res.map(e => e.id)
+            reslove(id)
+        })
+    })
+    for (var i = 0; i < ids.length; i++) {
+        await TCupdateZQ(ids[i])
+    }
+    console.log('更新完成？')
+    // TCupdateZQ(tc_id)
+
+    // 3. 受理清单： 更新账期
+    // 4. 更新账期
+}
+
+// pgk_id = 'arr obj str'
+// type = 'null, jf, js'
+const computedZhangqiState2 = async (pgk_id, type) => {
+    /*    ;`SELECT zq.*,j.date as j_date,b.date as b_date,a.product_main, b.package_name,b.id as b_id,a.uuid as a_id,j.id as j_id from zhangqi zq 
     left join accept a on a.pgk_id=zq.pgk_id 
     left join bill b on b.pgk_id=zq.pgk_id 
     left join jifen j on j.pgk_id=zq.pgk_id
-    where zq.date=b.date or zq.date=b.date``SELECT zq.*,a.product_main, b.package_name,b.id as b_id,a.id as a_id from zhangqi zq 
-left join accept a on a.pgk_id=zq.pgk_id and a.id=zq.list_id
+    where zq.date=b.date or zq.date=b.date``SELECT zq.*,a.product_main, b.package_name,b.id as b_id,a.uuid as a_id from zhangqi zq 
+left join accept a on a.pgk_id=zq.pgk_id and a.uuid=zq.list_id
 left join bill b on (b.pgk_id=zq.pgk_id and zq.date<=b.date)
 where zq.pgk_id=109
 group by zq.id
-`
+`*/
+    let pgk = typeof pgk_id
+    if (pgk === 'object') {
+        pgk = `in ('${pgk_id.join("','")}')`
+    } else if (pgk === 'string') {
+        pgk = `='${pgk_id}'`
+    } else {
+        pgk = `!=0`
+    }
+
+    // 1. 查询出所有未结算的清单
+
+    // 2. 查询出未结算的账期
+    //
+    return new Promise(reslove => {
+        DB.serialize(async () => {
+            DB.run('BEGIN TRANSACTION;')
+
+            const zq_sql = `select * from zhangqi where state != 1 and pgk_id ${pgk} order by date desc`
+            let ZQ_LIST = await sqlAll(zq_sql)
+            // console.log({ ZQ_LIST })
+
+            const sqlArr = []
+            const sqlArrE = []
+            // 更新结算清单
+            if (type !== 'jf') {
+                const js_sql = `
+                select a.uuid,a.pgk_id,a.action,jf.id,jf.date,jf.status
+                from bill jf 
+                left join accept a on a.pgk_id=jf.pgk_id and a.action_r like '%'||jf.user_number||'%'
+                where a.uuid is not null and jf.flag <>1 and jf.pgk_id ${pgk}
+                `
+                const JS_LIST = await sqlAll(js_sql)
+                // console.log({ JS_LIST })
+
+                JS_LIST.forEach(jf => {
+                    let idx = ZQ_LIST.findIndex(zq => {
+                        let type = jf.action === '新装' ? 1 : 3
+
+                        /*                    console.log(
+                            zq.list_id === jf.uuid,
+                            zq.pgk_id === jf.pgk_id,
+                            zq.date <= jf.date,
+                            zq.type === type
+                        )*/
+
+                        return (
+                            zq.list_id === jf.uuid && zq.pgk_id === jf.pgk_id && zq.date <= jf.date && zq.type === type
+                        )
+                    })
+                    // console.log(idx)
+
+                    if (idx !== -1) {
+                        let zq = ZQ_LIST[idx]
+
+                        let state = jf.status | 0
+                        if (state !== 1) {
+                            state = -1
+                        }
+
+                        let upzq = `update zhangqi set state=${state},qd_id='${jf.id}' where id='${zq.id}'`
+                        let upbl = `update bill set flag=1 where id='${jf.id}'`
+
+                        if (state === -1) {
+                            // console.log('sqlArrE', state)
+                            sqlArrE.push(upzq, upbl)
+                        } else {
+                            // 删除数据
+                            // console.log(zq.id, state)
+                            ZQ_LIST.splice(idx, 1)
+                            sqlArr.push(upzq, upbl)
+                        }
+
+                        // sqlArr.push(runSql(`update zhangqi set state=${state},qd_id='${jf.id}' where id='${zq.id}'`))
+                        // sqlArr.push(runSql(`update bill set flag=1 where id='${jf.id}'`))
+                    }
+                })
+            }
+            // 更新积分清单
+            if (type !== 'js') {
+                const jf_sql = `select a.uuid,a.pgk_id,a.action,jf.id,jf.date,jf.ydjf 
+                from jifen jf 
+                left join accept a on a.pgk_id=jf.pgk_id and a.action_r like '%'||jf.user_number||'%' 
+                where a.uuid is not null and jf.flag <>1 and jf.pgk_id ${pgk}`
+
+                const JF_LIST = await sqlAll(jf_sql)
+                // console.log({ JF_LIST })
+                JF_LIST.forEach(jf => {
+                    let idx = ZQ_LIST.findIndex(
+                        zq => zq.list_id === jf.uuid && zq.pgk_id === jf.pgk_id && zq.date <= jf.date && zq.type === 2
+                    )
+
+                    if (idx !== -1) {
+                        let zq = ZQ_LIST[idx]
+                        let state = jf.ydjf > 0 ? 1 : -1
+
+                        let upzq = `update zhangqi set state=${state},qd_id='${jf.id}' where id='${zq.id}'`
+                        let upbl = `update jifen set flag=1 where id='${jf.id}'`
+
+                        if (state === -1) {
+                            // console.log('sqlArrE', state)
+                            sqlArrE.push(upzq, upbl)
+                        } else {
+                            // 删除数据
+                            // console.log(zq.id, state)
+                            JF_LIST.splice(idx, 1)
+                            sqlArr.push(upzq, upbl)
+                        }
+
+                        // let [zq] = ZQ_LIST.splice(idx, 1)
+                        // console.log(zq, idx)
+                        // sqlArr.push(`update zhangqi set state=1,qd_id='${jf.id}' where id='${zq.id}'`)
+                        // sqlArr.push(`update jifen set flag=1 where id='${jf.id}'`)
+                    }
+                })
+            }
+            // 先插入state=-1的
+            // console.log({ sqlArrE, sqlArr })
+            if (sqlArrE.length) {
+                await new Promise(reslove => {
+                    sqlArrE.map(e => runSql(e))
+                    Promise.all(sqlArrE).then(res => {
+                        reslove(res)
+                    })
+                })
+            }
+
+            sqlArr.map(e => runSql(e))
+            Promise.all(sqlArr).then(res => {
+                DB.run('COMMIT TRANSACTION;')
+                console.log(6, Date.now())
+                reslove(true)
+            })
+        })
+    })
 }
 
 // 更新账期状态
@@ -26,7 +184,7 @@ const updateZhangqiState = ({ accept_id, pgk_id, date, type, state, qd_id }) => 
         // 1. 先查找当前账期及以下的数据
         let sql = ''
         if (state === 1) {
-            sql = `select id from zhangqi where list_id=${accept_id} and pgk_id=${pgk_id} and date<=${date} and type=${type} and state<>1`
+            sql = `select id from zhangqi where list_id=${accept_id} and pgk_id='${pgk_id}' and date<=${date} and type=${type} and state<>1`
 
             DB.get(sql, (err, res) => {
                 // console.log('updateZhangqiState', ...arguments, res)
@@ -41,7 +199,7 @@ const updateZhangqiState = ({ accept_id, pgk_id, date, type, state, qd_id }) => 
             })
         } else if (state === -1) {
             // 直接获取当前账期状态，如果为1这不处理
-            sql = `select id,state from zhangqi where list_id=${accept_id} and pgk_id=${pgk_id} and date=${date} and type=${type}`
+            sql = `select id,state from zhangqi where list_id='${accept_id}' and pgk_id='${pgk_id}' and date=${date} and type=${type}`
             DB.get(sql, (err, res) => {
                 reslove()
                 if (res) {
@@ -101,10 +259,13 @@ const computedZhangqiState = async pgk_id => {
 
 const deleteZhangqi2Qingdan = (ids, type) => {
     type = type === 'bill' ? 1 : 2
-    let sql = `delete from zhangqi where type=${type} and qd_id in (${ids.join(',')})`
+    let sql = `update zhangqi set qd_id=NULL,state=0 where type=${type} and qd_id in ('${ids.join("','")}')`
 
-    DB.run(sql, (err, res) => {
-        // console.log('deleteZhangqi2Qingdan', err, res, sql)
+    return new Promise(reslove => {
+        DB.run(sql, (err, res) => {
+            console.log('deleteZhangqi2Qingdan', err, res)
+            reslove()
+        })
     })
 }
 
@@ -130,13 +291,13 @@ const updateZhangqiJifenState = async (last_id, type = 'bill') => {
     let sql = ''
 
     if (type === 'bill') {
-        sql = `select b.id,b.package_name,b.user_number,a.id as a_id,p.id as p_id,b.date,b.status,a.action as accept_action
+        sql = `select b.id,b.package_name,b.user_number,a.uuid as a_id,p.id as p_id,b.date,b.status,a.action as accept_action
                     from ${type} b
                     left join accept a on (a.action_no=b.user_number or b.user_number=a.action_no)
                     left join pgk p on p.name=b.package_name
                     where p.id is not null and b.id > ${last_id}`
     } else {
-        sql = `select b.id,b.package_name,b.user_number,a.id as a_id,p.id as p_id,b.date
+        sql = `select b.id,b.package_name,b.user_number,a.uuid as a_id,p.id as p_id,b.date
                                 from ${type} b
                                 left join accept a on (a.action_no=b.user_number or b.user_number=a.action_no)
                                 left join pgk p on p.name=b.package_name
@@ -196,14 +357,14 @@ const updateZhangqiJifenState = async (last_id, type = 'bill') => {
         // console.log({ notAcceptId })
     })
 
-    /*    select  j.id,p.id as p_id,zq.id as z_id,j.user_number as j_user_number, a.id as a_id, a.user_number as a_user_number
+    /*    select  j.id,p.id as p_id,zq.id as z_id,j.user_number as j_user_number, a.uuid as a_id, a.user_number as a_user_number
         from jifen j 
         left join accept a on j.package_name=a.product_name and (j.user_number=a.user_number or j.user_number=a.action_no) 
         left join pgk p on p.name=j.package_name
-        left join zhangqi zq on zq.list_id=a.id and zq.qd_id=j.id and zq.pgk_id=p.id
+        left join zhangqi zq on zq.list_id=a.uuid and zq.qd_id=j.id and zq.pgk_id=p.id
         where j.id > 3000*/
     /*
-select  j.id,p.id as p_id,j.user_number as j_user_number, a.id as a_id, a.user_number as a_user_number, a.action_no, j.package_name, a.product_main
+select  j.id,p.id as p_id,j.user_number as j_user_number, a.uuid as a_id, a.user_number as a_user_number, a.action_no, j.package_name, a.product_main
     from bill j 
     left join accept a on (j.user_number=a.user_number or j.user_number=a.action_no) 
     left join pgk p on p.name=j.package_name
@@ -327,7 +488,7 @@ const fetchAcceptId = (user_number, pgk_id) => {
 // return {id: accetp_id, to: 结果， from: user_member}
 const fetchAcceptId2Re = ({ user_number, pgk_id }) => {
     return new Promise(reslove => {
-        const sql = `select r.id as r_id,a.id, a.action, a.action_no from related_user r left 
+        const sql = `select r.id as r_id,a.uuid, a.action, a.action_no from related_user r left 
         join accept a on a.action_no=r.a1 or a.action_no=r.a2 or a.action_no=r.a3 or a.action_no=r.a4 or a.action_no=r.a5 or a.action_no=r.a6 
         where a.action_no is not null and (a1='${user_number}' or a2='${user_number}' or a3='${user_number}' or a4='${user_number}' or a5='${user_number}' or a6='${user_number}')`
 
@@ -357,117 +518,257 @@ const fetchAcceptId2Re = ({ user_number, pgk_id }) => {
     })
 }
 
+const createAcceptSQL = (keys, values) => {
+    const keyStr = `'${keys.join("','")}'`
+
+    return values.map(e => {
+        const valStr = `'${e.join("','")}'`
+        return `INSERT INTO accept (${keyStr}) VALUES (${valStr})`
+    })
+}
+
 /*
  * 添加账期
  * item 账期详细信息
  * accepts 手里清单
  */
-const insertZhangqi = async (taocan, accepts) => {
-    console.log('--------------------------------------', { accepts })
-    return new Promise(reslove => {
-        if (!accepts || !accepts.length) {
-            return reslove(true)
+const createZhangqiSQL = (taocan, accept) => {
+    // 获取他套餐信息
+    let { id, count_js, count_jf, count_gs, law_jf, law_js, law_gs } = taocan
+    if (!count_js) {
+        law_js = []
+    } else {
+        law_js = law_js.toString().split(',')
+        law_js.length = count_js
+        law_js = Array.from(law_js, e => {
+            e = e * 1
+            if (isNaN(e)) e = 1
+            return e
+        })
+    }
+
+    // 组装每月结算间隔
+    if (!count_jf) {
+        law_jf = []
+    } else {
+        law_jf = law_jf.toString().split(',')
+        law_jf.length = count_jf
+        law_jf = Array.from(law_jf, e => {
+            e = e * 1
+            if (isNaN(e)) e = 1
+            return e
+        })
+    }
+
+    // 组装每月结算间隔
+    if (!count_gs) {
+        law_gs = []
+    } else {
+        law_gs = law_gs.toString().split(',')
+        law_gs.length = count_jf
+        law_gs = Array.from(law_gs, e => {
+            e = e * 1
+            if (isNaN(e)) e = 1
+            return e
+        })
+    }
+
+    let { date_end, created, uuid: accept_id, action } = accept
+
+    let date = !date_end ? created : date_end
+    if (date < 1000) {
+        console.log({ date, date1: isNaN(date), accept })
+    }
+    if (isNaN(date)) {
+        date = dayjs(date)
+    } else {
+        date = dayjs.unix(date)
+    }
+
+    // const date = dayjs.unix(date_end || created)
+
+    let sqlArr = []
+
+    if (action === '新装') {
+        let date_js = date
+        for (let i = 0; i < law_js.length; i++) {
+            date_js = dayjs(date_js)
+                .add(law_js[i], 'month')
+                .format('YYYYMM')
+            let q = getZhangqiSql(accept_id, id, date_js, 1)
+            sqlArr.push(q)
         }
-        // 获取他套餐信息
-        let { id, count_js, count_jf, count_gs, law_jf, law_js, law_gs } = taocan
-        // 2. 添加新账期。 2.1获取受理清单
-        console.log('ididididididididididididid', id, taocan)
-        // 组装每月结算间隔
-        if (!count_js) {
-            law_js = []
-        } else {
-            law_js = law_js.toString().split(',')
-            law_js.length = count_js
-            law_js = Array.from(law_js, e => {
-                e = e * 1
-                if (isNaN(e)) e = 1
-                return e
+
+        // 创建结算积分(jf)账期数据
+        let date_jf = date
+        for (let i = 0; i < law_jf.length; i++) {
+            date_jf = dayjs(date_jf)
+                .add(law_jf[i], 'month')
+                .format('YYYYMM')
+            let q = getZhangqiSql(accept_id, id, date_jf, 2)
+            sqlArr.push(q)
+        }
+    } else {
+        // 创建改数率账期数据
+        let date_gs = date
+        for (let i = 0; i < law_gs.length; i++) {
+            date_gs = dayjs(date_gs)
+                .add(law_gs[i], 'month')
+                .format('YYYYMM')
+
+            let q = getZhangqiSql(accept_id, id, date_gs, 3)
+            sqlArr.push(q)
+        }
+    }
+    return sqlArr
+}
+
+const getZhangqiSql = (accept_id, id, date, type) => {
+    return `insert into zhangqi (list_id, pgk_id, date, type) values ('${accept_id}','${id}',${date}, ${type})`
+}
+
+// 删除重复数据
+// 删除重复的accept
+// 删掉重复的账期
+const deleteReplaceData = () => {
+    // 查询出非重复的ID
+    const sql1 = `SELECT uuid FROM accept where uuid not in(SELECT d.uuid FROM ( SELECT uuid,import_date ,action_no, product_main, ACTION, created, product_name FROM accept ORDER BY ACTION DESC, created ASC, import_date desc
+) d GROUP BY d.action_no,d.product_name)`
+    return new Promise(async reslove => {
+        const replaceId = await new Promise(reslove => {
+            DB.all(sql1, (err, res = []) => {
+                // console.log(err, res)
+                reslove(res)
             })
+        })
+        // console.log(replaceId.length)
+        if (replaceId.length) {
+            await deleteZhangqi2accept(replaceId)
         }
+        reslove(true)
+    })
+}
 
-        // 组装每月结算间隔
-        if (!count_jf) {
-            law_jf = []
-        } else {
-            law_jf = law_jf.toString().split(',')
-            law_jf.length = count_jf
-            law_jf = Array.from(law_jf, e => {
-                e = e * 1
-                if (isNaN(e)) e = 1
-                return e
-            })
-        }
+// 删除所有关联的账期
+const deleteZhangqi2accept = apts => {
+    return new Promise(async reslove => {
+        if (!apts || !apts.length) return reslove(false)
+        let ids = `'${apts.map(e => e.uuid).join("','")}'`
 
-        // 组装每月结算间隔
-        if (!count_gs) {
-            law_gs = []
-        } else {
-            law_gs = law_gs.toString().split(',')
-            law_gs.length = count_jf
-            law_gs = Array.from(law_gs, e => {
-                e = e * 1
-                if (isNaN(e)) e = 1
-                return e
-            })
-        }
+        // 1. 先更新清单flag,再删除账期
+        const upSQL = [
+            `UPDATE jifen SET flag=0 where id in ( SELECT qd_id FROM zhangqi zq WHERE zq.list_id in(${ids}) and zq.qd_id is not null )`,
+            `UPDATE bill SET flag=0 where id in ( SELECT qd_id FROM zhangqi zq WHERE zq.list_id in(${ids}) and zq.qd_id is not null )`
+        ]
 
-        // console.log({ law_jf, law_js, accepts })
-
-        let promiseArr = []
-        for (let i = 0; i < accepts.length; i++) {
-            let { date_end, created, id: accept_id, action } = accepts[i]
-            let date = dayjs.unix(date_end || created)
-
-            // console.log('date begin', { date })
-            if (action === '新装') {
-                // 创建结算(js)清单账期数据
-                for (let i = 0; i < law_js.length; i++) {
-                    let date_js = dayjs(date)
-                        .add(law_js[i], 'month')
-                        .format('YYYYMM')
-                    /*
-                    console.log(
-                        '-------------------------------1',
-                        accepts[i].no,
-                        date_js,
-                        dayjs(date).format('YYYYMM'),
-                        dayjs(date).format('YYYY-MM-DD HH:mm:ss'),
-                        `add:${law_js[i]}`,
-                        `date_end: ${date_end}`
-                    )
-*/
-                    promiseArr.push(insertZhangqiItem(accept_id, id, date_js, 1))
+        await new Promise(reslove => {
+            let arr = []
+            DB.serialize(() => {
+                DB.run('BEGIN TRANSACTION;')
+                let i = 0
+                let len = upSQL.length
+                while (i < len) {
+                    arr.push(runSql(upSQL[i]))
+                    i++
                 }
 
-                // 创建结算积分(jf)账期数据
-                for (let i = 0; i < law_jf.length; i++) {
-                    let date_jf = dayjs(date)
-                        .add(law_jf[i], 'month')
-                        .format('YYYYMM')
-                    promiseArr.push(insertZhangqiItem(accept_id, id, date_jf, 2))
-                }
-            } else {
-                // 创建改数率账期数据
-                for (let i = 0; i < law_gs.length; i++) {
-                    let date_gs = dayjs(date_gs)
-                        .add(law_gs[i], 'month')
-                        .format('YYYYMM')
+                Promise.all(arr).then(res => {
+                    DB.run('COMMIT TRANSACTION;')
+                    console.log(61, Date.now())
+                    reslove()
+                })
+            })
+        })
 
-                    promiseArr.push(insertZhangqiItem(accept_id, id, date_gs, 3))
-                }
+        // 删除所有关联的账期
+        let arr = []
+        const sqls = [`delete from zhangqi where list_id in (${ids})`, `delete from accept where uuid in (${ids})`]
+        console.log(sqls)
+        DB.serialize(() => {
+            DB.run('BEGIN TRANSACTION;')
+            let i = 0
+            let len = sqls.length
+            while (i < len) {
+                arr.push(runSql(sqls[i]))
+                i++
             }
-        }
 
-        if (promiseArr.length) {
-            Promise.all(promiseArr).then(async values => {
-                console.log('Promise all promiseArr', values)
-                await computedZhangqiState(id)
-                // loading = false
+            Promise.all(arr).then(res => {
+                DB.run('COMMIT TRANSACTION;')
+                console.log(6, Date.now())
                 reslove(true)
             })
-        } else {
-            reslove(true)
+        })
+    })
+}
+// sql写入数据库
+const runSql2Arr = sqlArr => {
+    let arr = []
+    let len = sqlArr.length
+    let i = 0
+    console.log(0, Date.now())
+
+    return new Promise(reslove => {
+        if (!len) {
+            return reslove(true)
         }
+
+        DB.serialize(() => {
+            DB.run('BEGIN TRANSACTION;')
+            console.log(1, Date.now())
+
+            while (i < len) {
+                // console.log(sqlArr[i])
+                arr.push(runSql(sqlArr[i]))
+                /*             DB.run(sqlArr[i], (err, res = []) => {
+                    // console.log('runSql2', err, res)
+                    // reslove(res, sql)
+                })*/
+                i++
+                if (i >= len) {
+                    console.log(5, Date.now())
+                }
+            }
+
+            Promise.all(arr).then(res => {
+                DB.run('COMMIT TRANSACTION;')
+                console.log(6, Date.now())
+                reslove(true)
+            })
+        })
+    })
+}
+
+const sqlAll = (sql, params = []) => {
+    return new Promise(reslove => {
+        DB.all(sql, params, (err, res = []) => {
+            if (err) {
+                console.log(err, sql)
+            }
+            // console.log('runSql2', err, res, sql)
+            reslove(res)
+        })
+    })
+}
+const runSql = sql => {
+    // console.log('runSql', sql)
+    return new Promise(reslove => {
+        DB.run(sql, (err, res = []) => {
+            if (err) {
+                console.log(err, sql)
+            }
+            // console.log('runSql2', err, res, sql)
+            reslove(res)
+        })
+    })
+}
+
+const runSql2 = (sql, param) => {
+    // console.log('runSql', sql)
+    return new Promise(reslove => {
+        DB.run(sql, param, (err, res = []) => {
+            reslove(res)
+        })
     })
 }
 
@@ -498,72 +799,83 @@ const insertZhangqiItem = (accept_id, id, date, type) => {
  * 3. 根据结算清单和积分清单 重新统计账期
  * id => 套餐id
  */
-const updateZhangqi = async id => {
+const TCupdateZQ = async (id, isedit = false) => {
     //1. 删除账期
-    await deleteZhangqi(id)
-
-    // 1. 删除清单ID
-    let arr = []
-    arr.push(deletePgkid(id, 'bill'))
-    arr.push(deletePgkid(id, 'accept'))
-    arr.push(deletePgkid(id, 'jifen'))
-    await Promise.all(arr)
+    if (isedit) {
+        await deleteZhangqi(id)
+    }
 
     // 获取套餐详细
     let taocan = await fetchTaocanItem(id)
 
-    console.log({ taocan })
-
     // 添加套餐ID
-    arr = []
-    arr.push(addPgkid(taocan, 'bill'))
-    arr.push(addPgkid(taocan, 'accept'))
-    arr.push(addPgkid(taocan, 'jifen'))
-    await Promise.all(arr)
+    await addPgkid(taocan, ['bill', 'accept', 'jifen'])
 
-    // 更新账期
-    // todo: 计算 结算清单和积分清单
-
+    // 创建账期sql
     let accepts = await fetchAcceptLists2pgkid(id)
 
-    console.log('这是相关的受理清单', accepts)
+    let sqlArr = []
+    for (var i = 0; i < accepts.length; i++) {
+        sqlArr.push(...createZhangqiSQL(taocan, accepts[i]))
+    }
+    console.log(sqlArr)
 
-    return insertZhangqi(taocan, accepts)
+    // 添加账期
+    await runSql2Arr(sqlArr)
+
+    // 更新账期，结算表。
+    return computedZhangqiState2(id)
 }
 
 // 清单更新 pgk_id
-const addPgkid = async (taocan = {}, type) => {
-    /* let [name, ...alias] = await fetchTaocanName(id, 'id')
-    if (!name) {
-        return ''
-    }*/
+const addPgkid = async (taocan = {}, types = []) => {
+    // return new Promise(reslove => {})
 
-    let { id, name, alias } = taocan
-    if (!id) return
-
-    alias = formatAlias(alias)
-    // console.log('addPgkid', { taocan, type, alias })
-
-    let clounm_name = 'package_name'
-    if (type === 'accept') {
-        clounm_name = 'product_main'
-    }
     return new Promise(reslove => {
-        if (alias && alias.length) {
-            alias =
-                ' or ' +
-                alias
-                    .map(e => {
-                        return `${clounm_name}='${e}'`
-                    })
-                    .join(' or ')
-        }
+        let { id, name, alias } = taocan
+        console.log('addPgkid 1', id, taocan)
+        if (!id) return reslove()
 
-        const sql = `update ${type} set pgk_id=${id} where ${clounm_name}='${name}' ${alias}`
-        console.log('addPgkid', sql)
-        DB.run(sql, (err, res) => {
-            console.log('addPgkid', err, res, sql)
-            reslove(res)
+        alias = formatAlias(alias)
+        // console.log('addPgkid', { taocan, type, alias })
+        console.log({ alias })
+        DB.serialize(() => {
+            DB.run('BEGIN TRANSACTION;')
+
+            let sqlArr = []
+            for (var i = 0; i < types.length; i++) {
+                let clounm_name = types[i] === 'accept' ? 'product_main' : 'package_name'
+
+                let _alias = ''
+                if (alias && alias.length) {
+                    _alias =
+                        ' or ' +
+                        alias
+                            .map(e => {
+                                return `${clounm_name}='${e}'`
+                            })
+                            .join(' or ')
+                }
+
+                let sql = `update ${types[i]} set pgk_id='${id}' where ${clounm_name}='${name}' ${_alias}`
+                console.log(sql)
+                sqlArr.push(runSql(sql))
+
+                /*    DB.run(sql, id, (err, res) => {
+                    reslove(res)
+                })*/
+            }
+            // console.log(sqlArr)
+
+            Promise.all(sqlArr).then(res => {
+                DB.run('COMMIT TRANSACTION;')
+                reslove(true)
+            })
+            // DB.run('COMMIT TRANSACTION;')
+
+            /*runSql2Arr(sqlArr).then(res => {
+               
+            })*/
         })
     })
 }
@@ -625,7 +937,7 @@ const fetchTaocanItem2name = name => {
 // 获取单个套餐内容
 const fetchTaocanItem = id => {
     return new Promise(reslove => {
-        DB.get(`select * from pgk where id=${id}`, (err, res = {}) => {
+        DB.get(`select * from pgk where id=?`, id, (err, res = {}) => {
             reslove(res)
         })
     })
@@ -634,8 +946,8 @@ const fetchTaocanItem = id => {
 // 获取受理清单列表， name = 套餐名称
 const fetchAcceptLists = name => {
     return new Promise(reslove => {
-        const sql = `select * from accept where product_main = '${name}'`
-        DB.all(sql, (err, res = []) => {
+        const sql = `select * from accept where product_main = ?`
+        DB.all(sql, name, (err, res = []) => {
             // console.log('fetchAcceptLists', err, res, sql)
             reslove(res)
         })
@@ -645,9 +957,9 @@ const fetchAcceptLists = name => {
 // 获取受理清单列表， name = 套餐名称
 const fetchAcceptLists2pgkid = pgk_id => {
     return new Promise(reslove => {
-        const sql = `select * from accept where pgk_id = '${pgk_id}'`
-        DB.all(sql, (err, res = []) => {
-            // console.log('fetchAcceptLists', err, res, sql)
+        const sql = `select * from accept where pgk_id = ?`
+        DB.all(sql, pgk_id, (err, res = []) => {
+            console.log('fetchAcceptLists', err, res, pgk_id)
             reslove(res)
         })
     })
@@ -658,18 +970,25 @@ const fetchAcceptLists2pgkid = pgk_id => {
  * id int 套餐ID
  */
 const deleteZhangqi = id => {
-    const sql1 = `delete from zhangqi where pgk_id='${id}'`
-    const sql2 = `update bill set pgk_id=0 where pgk_id=${id}`
-    const sql3 = `update jifen set pgk_id=0 where pgk_id=${id}`
+    const sql1 = `delete from zhangqi where pgk_id=?`
+    const sql2 = `update bill set pgk_id=0,flag=0 where pgk_id=?`
+    const sql3 = `update jifen set pgk_id=0,flag=0 where pgk_id=?`
+    const sql4 = `update accept set pgk_id=0 where pgk_id=?`
 
-    DB.run(sql1, (err, res) => {
-        console.log('deleteZhangqi', err, res)
-    })
-    DB.run(sql2, (err, res) => {
-        console.log('deleteZhangqi', err, res)
-    })
-    DB.run(sql3, (err, res) => {
-        console.log('deleteZhangqi', err, res)
+    const arr = [sql1, sql2, sql3, sql4]
+    return new Promise(reslove => {
+        DB.serialize(() => {
+            DB.run('BEGIN TRANSACTION;')
+            console.log(1, Date.now())
+            let i = 0
+            while (i < arr.length) {
+                DB.run(arr[i], id, (err, res) => {})
+                i++
+            }
+
+            DB.run('COMMIT TRANSACTION;')
+            reslove(true)
+        })
     })
 }
 
@@ -678,11 +997,11 @@ const importSLNoneJS = (pgk_id, date) => {
     return new Promise(reslove => {
         let _date = date ? `zq.date=${date}` : true
 
-        // const sql = `select zq.date,a.* from accept a left join zhangqi zq on zq.pgk_id=a.pgk_id where a.pgk_id=${pgk_id} and zq.date=${date} group by a.id`
-        // const sql = `select a.*,zq.qd_id,zq.state,zq.date from accept a left join zhangqi zq on zq.list_id=a.id where a.pgk_id=${pgk_id} and zq.state=0 group by a.id`
-        const sql = `select a.*,zq.qd_id,zq.state,zq.date from accept a left join zhangqi zq on zq.list_id=a.id and ${_date} where a.pgk_id=${pgk_id} and zq.state=0  group by a.id`
+        // const sql = `select zq.date,a.* from accept a left join zhangqi zq on zq.pgk_id=a.pgk_id where a.pgk_id=${pgk_id} and zq.date=${date} group by a.uuid`
+        // const sql = `select a.*,zq.qd_id,zq.state,zq.date from accept a left join zhangqi zq on zq.list_id=a.uuid where a.pgk_id=${pgk_id} and zq.state=0 group by a.uuid`
+        const sql = `select a.*,zq.qd_id,zq.state,zq.date from accept a left join zhangqi zq on zq.list_id=a.uuid and ${_date} where a.pgk_id='${pgk_id}' and zq.state=0  group by a.uuid`
 
-        DB.all(sql, (err, res) => {
+        DB.all(sql, (err, res = []) => {
             let notfoundItems = {
                 date: '账期',
                 no: '购物车流水号',
@@ -733,13 +1052,15 @@ const parseAoaData = (datas, json = '') => {
     return datas
 }
 
-// 导出[结算清单] 所有没有受理清单的
+// 导出[结算清单(未受理)] 所有没有受理清单的
 const importJSNoneSL = (pgk_id, date) => {
     return new Promise(reslove => {
         let _date = date ? `b.date=${date}` : true
-        const sql = `select b.* from bill b where ${_date} and b.pgk_id=125 and b.id not in (select zq.qd_id from zhangqi zq where zq.pgk_id=125 and zq.qd_id is not null)`
+        const sql = `select * from bill b where b.flag !=1 and b.pgk_id=? and ${_date}`
+        // const sql = `select b.* from bill b where ${_date} and b.pgk_id='${pgk_id}' and b.id not in (select zq.qd_id from zhangqi zq where zq.pgk_id='${pgk_id}' and zq.qd_id is not null)`
         // const sql = `select zq.date,zq.state,b.* from bill b left join zhangqi zq on zq.pgk_id=b.pgk_id where zq.state=0 and b.pgk_id=${pgk_id} and zq.date='${date}' group by b.id`
-        DB.all(sql, (err, res) => {
+        DB.all(sql, pgk_id, (err, res) => {
+            console.log(sql, res)
             let notfoundItems = {
                 date: '账期',
                 order_id: '订单号',
@@ -769,14 +1090,63 @@ const importJSNoneSL = (pgk_id, date) => {
     })
 }
 
+// 返回 {id: #name#alias#}
+const getAllTaocan = () => {
+    return new Promise(reslove => {
+        DB.all(`select * from pgk`, (err, res = []) => {
+            console.log('all taocan', err, res)
+            // if (!res) return reslove([])
+
+            const data = res.map(e => {
+                let arr = [e.name]
+                if (e.alias) {
+                    let val = formatAlias(e.alias)
+                    arr.push(...val)
+                }
+                return { ...e, val: `#${arr.join('#')}#` }
+            })
+            reslove(data)
+        })
+    })
+}
+// 返回 {id: #name#alias#}
+const getAllFuka = () => {
+    return new Promise(reslove => {
+        DB.all(`select * from related_user`, (err, res = []) => {
+            // if (!res) return reslove([])
+
+            const data = res.map(e => {
+                let val = []
+                for (let n in e) {
+                    if (n !== 'id') {
+                        val.push(e[n])
+                    }
+                }
+                return `#${val.join('#')}#`
+            })
+            return reslove(data)
+        })
+    })
+}
+
 export {
+    runSql2,
+    sqlAll,
+    computedZhangqiState2,
+    runSql2Arr,
+    deleteZhangqi2accept,
+    getAllFuka,
+    getAllTaocan,
     importSLNoneJS,
     importJSNoneSL,
-    insertZhangqi,
+    createAcceptSQL,
+    createZhangqiSQL,
     updateZhangqiJifenState,
     deleteZhangqi2Qingdan,
     fetchTaocanItem2name,
-    updateZhangqi,
+    deleteReplaceData,
+    TCupdateZQ,
     deleteZhangqi,
-    SLinsertZhangqi
+    SLinsertZhangqi,
+    updateAllData
 }
