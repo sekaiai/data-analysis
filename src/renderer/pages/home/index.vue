@@ -686,6 +686,7 @@ export default {
             let json = {
                 date: '账期',
                 type: '账期类型',
+                stat: '状态',
                 action_r: '副卡信息',
                 ...this.notfoundItems
                 // zq_type: '结算类型', // 1:结算清单 2.积分清单
@@ -714,20 +715,26 @@ export default {
                     e.type = '积分清单'
                     jf.push(e)
                     if (e.zq_state == -1) {
+                        e.stat = '结算失败'
                         jf_fail.push(e)
                     } else if (e.zq_state == 1) {
+                        e.stat = '结算成功'
                         jf_suss.push(e)
                     } else {
+                        e.stat = '未结算'
                         jf_none.push(e)
                     }
                 } else {
                     e.type = '结算清单'
                     js.push(e)
                     if (e.zq_state == -1) {
+                        e.stat = '结算失败'
                         js_fail.push(e)
                     } else if (e.zq_state == 1) {
+                        e.stat = '结算成功'
                         js_suss.push(e)
                     } else {
+                        e.stat = '未结算'
                         js_none.push(e)
                     }
                 }

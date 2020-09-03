@@ -19,6 +19,7 @@
                 <p v-for="(v, i) in logs" :key="i" v-html="v"></p>
             </div>
         </template>
+        <p>{{ btntext }}</p>
         <div class="form-line" style="margin-top: 20px" v-if="datas.length">
             <el-button :loading="insertStatus" type="success" @click="insertAccept">
                 {{ btntext }}
@@ -326,7 +327,7 @@ export default {
             console.log(fukaArr)
             const zqArr = [] //账期sql arr
             const pgk_ids = new Set()
-            console.log(taocanArr, fukaArr)
+            // console.log(taocanArr, fukaArr)
 
             for (var i = this.datas.length - 1; i >= 0; i--) {
                 let item = this.datas[i]
@@ -402,6 +403,7 @@ export default {
                 console.log('runSql2Arr over', res)
                 this.btntext = '正在查找重复数据'
                 this.$notify.info({
+                    duration: 20000,
                     title: '受理清单导入完成！',
                     message: '开始查找重复数据。'
                 })
@@ -411,15 +413,18 @@ export default {
                     this.onFetchMonthLength()
 
                     this.$notify.info({
+                        duration: 20000,
                         title: '重复数据删除完成！',
                         message: '开始更新账期信息。'
                     })
 
                     // 开始更新账期
                     computedZhangqiState2(Array.from(pgk_ids)).then(res => {
+                        this.datas = []
                         this.insertStatus = false
                         this.btntext = '写入完成'
                         this.$notify.success({
+                            duration: 20000,
                             title: '完成',
                             message: '账期更新完毕，所有操作结束！'
                         })
