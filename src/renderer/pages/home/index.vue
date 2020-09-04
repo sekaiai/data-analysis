@@ -480,7 +480,13 @@ export default {
         this.onInit()
     },
     methods: {
-        updateAllData,
+        async updateAllData() {
+            this.allLoading = true
+            await updateAllData()
+            this.onInit()
+
+            this.allLoading = false
+        },
         formatDay(date) {
             return dayjs.unix(date).format('YYYY-MM-DD HH:mm:ss')
         },

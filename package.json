@@ -1,6 +1,6 @@
 {
   "name": "data-analysis",
-  "version": "1.5.0",
+  "version": "1.5.2",
   "author": "313867808@qq.com",
   "description": "Easy invoicing system stand-alone desktop version,An electron-vue sqlite3 project",
   "license": "MIT",
