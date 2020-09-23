@@ -61,36 +61,62 @@ group by zq.id
             // 更新结算清单
             if (type !== 'jf') {
                 const js_sql = `
-                select a.uuid,a.pgk_id,a.action,jf.id,jf.date,jf.status
+                select a.uuid,a.pgk_id,a.action,jf.id,jf.date,jf.status,jf.user_number
                 from bill jf 
                 left join accept a on a.pgk_id=jf.pgk_id and a.action_r like '%'||jf.user_number||'%'
-                where a.uuid is not null and jf.flag <>1 and jf.pgk_id ${pgk}
+                where a.uuid is not null and jf.flag <>1 and jf.pgk_id ${pgk} GROUP by jf.id
                 `
                 const JS_LIST = await sqlAll(js_sql)
 
                 // desc， 大的排前面，js结算的时候先把打的结算了。避免小的账期无法结算
-                const zq_js_sql = `select * from zhangqi where state !=1 and type!=2 and pgk_id ${pgk} order by date desc`
+                const zq_js_sql = `select zq.*,a.action_no from zhangqi zq left join accept a on a.uuid=zq.list_id where zq.state !=1 and zq.type!=2 and zq.pgk_id ${pgk} order by zq.date desc`
                 let ZQ_JS_LIST = await sqlAll(zq_js_sql)
 
-                JS_LIST.forEach(jf => {
-                    let idx = ZQ_JS_LIST.findIndex(zq => {
+                // JS_LIST.forEach(jf => {
+                for (let ii = 0; ii < JS_LIST.length; ii++) {
+                    let jf = JS_LIST[ii]
+                    // console.log(JS_LIST.length, 'ZQ_JS_LIST', ZQ_JS_LIST, JS_LIST)
+                    /*                  let idx = ZQ_JS_LIST.findIndex(zq => {
                         let type = jf.action === '新装' ? 1 : 3
-
-                        /*                    console.log(
-                            zq.list_id === jf.uuid,
-                            zq.pgk_id === jf.pgk_id,
-                            zq.date <= jf.date,
-                            zq.type === type
-                        )*/
-
                         return (
                             zq.list_id === jf.uuid && zq.pgk_id === jf.pgk_id && zq.date <= jf.date && zq.type === type
                         )
-                    })
-                    // console.log(idx)
+                    })*/
+                    // 选出所有可用的结算清单，然后匹配取业务号最匹配的
+                    let _zqlist = '' //用来存业务号相同的清单
+                    let _zqlist2 = '' //用来存业务号相同的清单
+                    for (var i = 0; i < ZQ_JS_LIST.length; i++) {
+                        let zq = ZQ_JS_LIST[i]
+                        let type = jf.action === '新装' ? 1 : 3
+                        // 去掉时间匹配
+                        // zq.date <= jf.date &&
+                        if (zq.list_id === jf.uuid && zq.pgk_id === jf.pgk_id && zq.type === type) {
+                            // 取业务号相同的。
+                            if (zq.user_member == jf.action_no) {
+                                // 取日期最小的
+                                if (!_zqlist2) {
+                                    _zqlist2 = { zq, i }
+                                } else if (!_zqlist2.zq.date < zq.date) {
+                                    _zqlist2 = { zq, i }
+                                }
+                            } else {
+                                // 取日期最小的
+                                if (!_zqlist) {
+                                    _zqlist = { zq, i }
+                                } else if (!_zqlist.zq.date < zq.date) {
+                                    _zqlist = { zq, i }
+                                }
+                            }
+                        }
+                    }
+                    // 取最匹配的。
+                    if (_zqlist2) {
+                        _zqlist = _zqlist2
+                    }
 
-                    if (idx !== -1) {
-                        let zq = ZQ_JS_LIST[idx]
+                    if (_zqlist) {
+                        let zq = _zqlist.zq
+                        // console.log('我是账期', jf.id, zq.id)
 
                         let state = jf.status | 0
                         if (state !== 1) {
@@ -105,22 +131,24 @@ group by zq.id
                             sqlArrE.push(upzq, upbl)
                         } else {
                             // 删除数据
-                            // console.log(zq.id, state)
-                            ZQ_JS_LIST.splice(idx, 1)
+                            // console.log(zq)
+                            ZQ_JS_LIST.splice(_zqlist.i, 1)
                             sqlArr.push(upzq, upbl)
                         }
 
                         // sqlArr.push(runSql(`update zhangqi set state=${state},qd_id='${jf.id}' where id='${zq.id}'`))
                         // sqlArr.push(runSql(`update bill set flag=1 where id='${jf.id}'`))
                     }
-                })
+                    // })
+                }
             }
+            // console.log(sqlArr)
             // 更新积分清单
             if (type !== 'js') {
                 const jf_sql = `select a.uuid,a.pgk_id,a.action,jf.id,jf.date,jf.ydjf 
                 from jifen jf 
                 left join accept a on a.pgk_id=jf.pgk_id and a.action_r like '%'||jf.user_number||'%' 
-                where a.uuid is not null and jf.flag <>1 and jf.pgk_id ${pgk}`
+                where a.uuid is not null and jf.flag <>1 and jf.pgk_id ${pgk}  GROUP by jf.id`
                 const JF_LIST = await sqlAll(jf_sql)
 
                 // asc，日期小的先结算
@@ -134,12 +162,14 @@ group by zq.id
                     let idx = ZQ_JF_LIST.findIndex(
                         zq => zq.list_id === jf.uuid && zq.pgk_id === jf.pgk_id && zq.type === 2 && zq.state == 0
                     )
+                    // console.log('第一次结算？', idx)
                     // 如果没有未结算的，则找出已结算且结算失败的来更新。
                     if (idx === -1) {
                         idx = ZQ_JF_LIST.findIndex(
                             zq => zq.list_id === jf.uuid && zq.pgk_id === jf.pgk_id && zq.type === 2 && zq.state == -1
                         )
                     }
+                    // console.log('第二次结算？', idx)
 
                     if (idx !== -1) {
                         let zq = ZQ_JF_LIST[idx]
@@ -154,9 +184,9 @@ group by zq.id
                         } else {
                             // 删除数据
                             // console.log('删除数据', idx, zq)
-                            ZQ_JF_LIST.splice(idx, 1)
                             sqlArr.push(upzq, upbl)
                         }
+                        ZQ_JF_LIST.splice(idx, 1)
 
                         // let [zq] = ZQ_JF_LIST.splice(idx, 1)
                         // console.log(zq, idx)
@@ -606,9 +636,11 @@ const createZhangqiSQL = (taocan, accept) => {
     if (action === '新装') {
         let date_js = date
         for (let i = 0; i < law_js.length; i++) {
+            // console.log(1, date_js, law_js[i])
             date_js = dayjs(date_js)
                 .add(law_js[i], 'month')
                 .format('YYYYMM')
+            // console.log(2, date_js, law_js[i])
             let q = getZhangqiSql(accept_id, id, date_js, 1)
             sqlArr.push(q)
         }
@@ -1013,11 +1045,12 @@ const importSLNoneJS = (pgk_id, date) => {
 
         // const sql = `select zq.date,a.* from accept a left join zhangqi zq on zq.pgk_id=a.pgk_id where a.pgk_id=${pgk_id} and zq.date=${date} group by a.uuid`
         // const sql = `select a.*,zq.qd_id,zq.state,zq.date from accept a left join zhangqi zq on zq.list_id=a.uuid where a.pgk_id=${pgk_id} and zq.state=0 group by a.uuid`
-        const sql = `select a.*,zq.qd_id,zq.state,zq.date from accept a left join zhangqi zq on zq.list_id=a.uuid and ${_date} where a.pgk_id='${pgk_id}' and zq.state=0  group by a.uuid`
+        const sql = `select a.*,zq.qd_id,zq.state,zq.date,zq.type as zq_type from accept a left join zhangqi zq on zq.list_id=a.uuid and ${_date} where a.pgk_id='${pgk_id}' and zq.state=0  group by a.uuid,zq.type`
 
         DB.all(sql, (err, res = []) => {
             let notfoundItems = {
                 date: '账期',
+                zq_type: '账期类型',
                 no: '购物车流水号',
                 area: '地区',
                 addr: '渠道名称',
@@ -1027,7 +1060,6 @@ const importSLNoneJS = (pgk_id, date) => {
                 product_main: '所属主销售品',
                 action: '业务动作',
                 action_no: '业务号码',
-                user_number: '结算号码(副卡)',
                 created: '受理时间',
                 status: '工单状态',
                 date_end: '竣工时间',
@@ -1057,6 +1089,9 @@ const parseAoaData = (datas, json = '') => {
         return keys.map(k => {
             if (k === 'date_end' || k === 'created') {
                 v[k] = dayjs.unix(v[k]).format('YYYY-MM-DD HH:mm:ss')
+            }
+            if (k === 'zq_type') {
+                v[k] = v[k] !== 1 ? '积分' : '普通'
             }
             return v[k]
         })

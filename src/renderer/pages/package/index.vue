@@ -370,8 +370,8 @@ export default {
             const js = await importJSNoneSL(id, date)
 
             const datas = [
-                { bookName: '结算清单（未受理）', datas: js },
-                { bookName: '受理清单（未结算）', datas: sl }
+                { bookName: '未受理的结算清单', datas: js },
+                { bookName: '未结算的受理清单', datas: sl }
             ]
             // console.log(datas)
 

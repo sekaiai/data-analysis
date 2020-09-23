@@ -533,7 +533,7 @@ export default {
                 `select b.*,zq.state,zq.type as zq_type from bill b left join zhangqi zq on b.id=zq.qd_id where ${bi_where}`,
                 `select j.*,zq.type as zq_type, zq.state as zq_state from jifen j left join zhangqi zq on zq.qd_id=j.id where ${ji_where}`
             ]
-            console.log(sql)
+            // console.log(sql)
             this.$db.serialize(() => {
                 this.$db.run('BEGIN TRANSACTION;')
 
@@ -547,7 +547,7 @@ export default {
 
                 Promise.all(sql).then(([zhangqi, js_list, jf_list]) => {
                     this.$db.run('COMMIT TRANSACTION;')
-                    console.log('数据请求完成', Date.now(), zhangqi.length, js_list.length, jf_list.length, js_list)
+                    // console.log('数据请求完成', Date.now(), zhangqi.length, js_list.length, jf_list.length, js_list)
                     // 组装数据
                     zhangqi = this.formatAllDatas(zhangqi)
                     js_list = this.formatJsList(js_list)
@@ -574,7 +574,7 @@ export default {
                 // 积分清单
                 `select zq.type as zq_type, zq.state as zq_state,zq.date as zq_date,a.*,j.* from zhangqi zq left join accept a on zq.list_id=a.uuid left join jifen j on j.id = zq.qd_id where ${where} and zq.type=2`
             ]
-            console.log(sql)
+            // console.log(sql)
 
             this.$db.serialize(() => {
                 this.$db.run('BEGIN TRANSACTION;')
@@ -589,7 +589,7 @@ export default {
 
                 Promise.all(sql).then(([all, js_list, gs_list, jf_list]) => {
                     this.$db.run('COMMIT TRANSACTION;')
-                    console.log('数据请求完成', Date.now())
+                    // console.log('数据请求完成', Date.now())
                     // 组装数据
                     all = this.formatAllDatas(all)
                     js_list = this.formatJsList(js_list)
@@ -872,7 +872,7 @@ export default {
             })
         },
         async fetchSlLists2() {
-            console.log('fetchSlLists')
+            // console.log('fetchSlLists')
             // 账期  需结算 结算成功    结算失败    没有结算清单  积分清单    没有积分清单  操作
 
             let result = {}
@@ -883,7 +883,7 @@ export default {
 
             const zqsql = `select state,date from zhangqi where date <= ?`
             const zq = await sqlAll(zqsql, max)
-            console.log(aps, zq)
+            // console.log(aps, zq)
             for (let i = 0; i < aps.length; i++) {
                 let { date_end, pgk_id, created } = aps[i]
                 let date = date_end || created
@@ -930,12 +930,12 @@ export default {
                     result[date].zq_suss++
                 }
             }
-            console.log(result)
+            // console.log(result)
             let arr2 = []
             for (let x in result) {
                 let x2 = result[x]
                 x2.date = x
-                console.log('x2.tc', x2.tc)
+                // console.log('x2.tc', x2.tc)
                 x2.tc = Array.from(x2.tc).filter(e => e && e != 0).length
                 arr2.push(x2)
             }
@@ -962,7 +962,7 @@ export default {
                 .join(' union all ')
 
             this.$db.all(sql, (err, res) => {
-                console.log('fetchSlLists', res)
+                // console.log('fetchSlLists', res)
                 if (!res) return
                 const arr = {}
                 res.forEach(e => {
@@ -1022,7 +1022,7 @@ export default {
         },
         // 获取受理清单
         fetchSlLists() {
-            console.log('fetchSlLists')
+            // console.log('fetchSlLists')
             // 账期  需结算 结算成功    结算失败    没有结算清单  积分清单    没有积分清单  操作
 
             const max = dayjs().format('YYYYMM')
@@ -1205,7 +1205,7 @@ export default {
 
             for (var i = 0; i < fileList.length; i++) {
                 let { jf_sql, tc_ids } = this.openJfExcel(fileList[i], taocanArr)
-                console.log({ jf_sql, tc_ids })
+                // console.log({ jf_sql, tc_ids })
                 sqlArr.push(...jf_sql)
                 tcArr.push(...tc_ids)
             }
@@ -1213,7 +1213,7 @@ export default {
             // 写入数据
             runSql2Arr(sqlArr).then(res => {
                 tcArr = Array.from(tcArr)
-                console.log({ tcArr })
+                // console.log({ tcArr })
 
                 computedZhangqiState2(tcArr)
 
@@ -1261,7 +1261,7 @@ export default {
                                 obj.ydjf = e['应兑换积分'] || e['本月兑换金额']
                             } else if (k === 'pgk_id') {
                                 let t = taocanArr.find(t2 => {
-                                    console.log(t2, e['入网套餐'])
+                                    // console.log(t2, e['入网套餐'])
                                     return t2.val.indexOf(`#${e['入网套餐']}#`) > -1
                                 })
                                 if (t) {
@@ -2397,15 +2397,15 @@ export default {
 
             for (var i = 0; i < fileList.length; i++) {
                 let { js_sql, tc_ids } = this.onOpenFile(fileList[i], taocanArr)
-                console.log({ js_sql, tc_ids })
+                // console.log({ js_sql, tc_ids })
                 sqlArr.push(...js_sql)
                 tcArr.push(...tc_ids)
             }
 
             runSql2Arr(sqlArr).then(res => {
-                console.log('runSql2Arr over', res, { tcArr })
+                // console.log('runSql2Arr over', res, { tcArr })
                 tcArr = Array.from(tcArr)
-                console.log({ tcArr })
+                // console.log({ tcArr })
 
                 computedZhangqiState2(tcArr)
 
@@ -2460,7 +2460,7 @@ export default {
                             let v = this.columns[k]
                             if (k === 'pgk_id') {
                                 let t = taocanArr.find(t2 => {
-                                    console.log(t2, e['发展套餐名'])
+                                    // console.log(t2, e['发展套餐名'])
                                     return t2.val.indexOf(`#${e['发展套餐名']}#`) > -1
                                 })
                                 if (t) {
