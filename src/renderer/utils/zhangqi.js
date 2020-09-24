@@ -60,13 +60,26 @@ group by zq.id
             const sqlArrE = []
             // 更新结算清单
             if (type !== 'jf') {
-                const js_sql = `
+                // js_sql start
+                // 先精准匹配user_menber,如果不存在再匹配action_r
+                let js_sql = `
                 select a.uuid,a.pgk_id,a.action,jf.id,jf.date,jf.status,jf.user_number
                 from bill jf 
-                left join accept a on a.pgk_id=jf.pgk_id and a.action_r like '%'||jf.user_number||'%'
+                left join accept a on a.pgk_id=jf.pgk_id and a.action_no=jf.user_number
                 where a.uuid is not null and jf.flag <>1 and jf.pgk_id ${pgk} GROUP by jf.id
                 `
-                const JS_LIST = await sqlAll(js_sql)
+                let JS_LIST = await sqlAll(js_sql)
+                if (!JS_LIST.length) {
+                    js_sql = `
+                    select a.uuid,a.pgk_id,a.action,jf.id,jf.date,jf.status,jf.user_number
+                    from bill jf 
+                    left join accept a on a.pgk_id=jf.pgk_id and a.action_r like '%'||jf.user_number||'%'
+                    where a.uuid is not null and jf.flag <>1 and jf.pgk_id ${pgk} GROUP by jf.id
+                    `
+                    JS_LIST = await sqlAll(js_sql)
+                }
+
+                // js_sql end
 
                 // desc， 大的排前面，js结算的时候先把打的结算了。避免小的账期无法结算
                 const zq_js_sql = `select zq.*,a.action_no from zhangqi zq left join accept a on a.uuid=zq.list_id where zq.state !=1 and zq.type!=2 and zq.pgk_id ${pgk} order by zq.date desc`

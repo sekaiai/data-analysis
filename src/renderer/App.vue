@@ -2,19 +2,23 @@
     <div id="app" class="flex">
         <el-menu class="menu-vertical" default-active="1" :router="true" :collapse="true" background-color="#545c64">
             <el-menu-item index="1">
-                <i class="el-icon-menu"></i>
+                <i class="el-icon-c-scale-to-original"></i>
                 <span slot="title">结算分析</span>
+            </el-menu-item>
+            <el-menu-item index="10" :route="{ name: 'zhangqi' }">
+                <i class="el-icon-s-marketing"></i>
+                <span slot="title">账期</span>
             </el-menu-item>
             <el-menu-item index="2" :route="{ name: 'accept' }">
                 <i class="el-icon-document"></i>
                 <span slot="title">受理清单</span>
             </el-menu-item>
             <el-menu-item index="6" :route="{ name: 'bill.list' }">
-                <i class="el-icon-document"></i>
+                <i class="el-icon-data-line"></i>
                 <span slot="title">结算清单</span>
             </el-menu-item>
             <el-menu-item index="7" :route="{ name: 'bill.jifen' }">
-                <i class="el-icon-document"></i>
+                <i class="el-icon-data-analysis"></i>
                 <span slot="title">积分清单</span>
             </el-menu-item>
             <el-menu-item index="3" :route="{ name: 'package' }">

@@ -102,7 +102,7 @@
 
                 <el-table-column label="操作">
                     <template slot-scope="scope">
-                        <el-button type="text" :loading="downSlListLoading" @click="downloadSlList(scope.row.date)"
+                        <el-button type="text" :loading="downSlListLoading" @click="downloadSlList2(scope.row.date)"
                             >下载</el-button
                         >
                     </template>
@@ -562,17 +562,14 @@ export default {
             // 下载受理清单
             this.downSlListLoading = true
 
-            let where = `${date === '总计' ? true : 'zq.date=' + date}`
+            let zq_where = `zq.date=${date}`
 
+            // 1.未结算的账期
+            // 2.未结算的结算清单
+            // 3.未结算的积分清单
             let sql = [
                 // 账期受理清单
-                `select zq.type as zq_type,zq.list_id, zq.state as zq_state,a.* from zhangqi zq left join accept a on zq.list_id=a.uuid where ${where}`,
-
-                // 结算清单
-                `select zq.type as zq_type, zq.state as zq_state,a.*,b.date as b_date,b.branch as b_branch,b.commission_money as b_money,b.order_id as b_order_id,b.user_number as b_user_member from zhangqi zq left join accept a on zq.list_id=a.uuid left join bill b on b.id = zq.qd_id where ${where} and zq.type=1`,
-                `select zq.type as zq_type, zq.state as zq_state,a.*,b.date as b_date,b.branch as b_branch,b.commission_money as b_money,b.order_id as b_order_id,b.user_number as b_user_member from zhangqi zq left join accept a on zq.list_id=a.uuid left join bill b on b.id = zq.qd_id where ${where} and zq.type=3`,
-                // 积分清单
-                `select zq.type as zq_type, zq.state as zq_state,zq.date as zq_date,a.*,j.* from zhangqi zq left join accept a on zq.list_id=a.uuid left join jifen j on j.id = zq.qd_id where ${where} and zq.type=2`
+                `select zq.id as zq_id, zq.date,zq.type as zq_type,zq.list_id, zq.state as zq_state,a.* from zhangqi zq left join accept a on zq.list_id=a.uuid where ${zq_where} and zq.state=0`
             ]
             // console.log(sql)
 
@@ -587,33 +584,17 @@ export default {
                     })
                 })
 
-                Promise.all(sql).then(([all, js_list, gs_list, jf_list]) => {
+                Promise.all(sql).then(([zhangqi]) => {
                     this.$db.run('COMMIT TRANSACTION;')
-                    // console.log('数据请求完成', Date.now())
+                    // console.log('数据请求完成', Date.now(), zhangqi.length, js_list.length, jf_list.length, js_list)
                     // 组装数据
-                    all = this.formatAllDatas(all)
-                    js_list = this.formatJsList(js_list)
-                    jf_list = this.formatJFList(jf_list)
-                    gs_list = this.formatJsList(gs_list, '改速率')
+                    zhangqi = this.formatAllDatas(zhangqi)
+                    console.log('账期', zhangqi)
+                    this.onDownload([...zhangqi], `${date}未结算的账期`)
 
-                    // 下载
-                    this.onDownload([all, ...js_list, ...jf_list, ...gs_list], `${date}受理清单结算信息`)
                     this.downSlListLoading = false
                 })
             })
-            /*            // 账期受理清单
-            sql = sql.map(e => {
-                return new Promise(resolve => {
-                    this.$db.all(e, (err, res = []) => {
-                        resolve(res)
-                    })
-                })
-            })
-
-            Promise.all(sql).then(([all, js_list, gs_list, jf_list]) => {
-                console.log('数据请求完成')
- 
-            })*/
         },
         formatJFList(jf_list) {
             let suss = [],
@@ -691,25 +672,17 @@ export default {
             // 账期 门店工号 门店名称 销售人员 用户ID 套餐名称 业务动作 业务号码 结算号码 揽收人
             let json = {
                 date: '账期',
+                zq_id: '账期ID',
                 type: '账期类型',
-                stat: '状态',
+                // stat: '状态',
                 action_r: '副卡信息',
                 ...this.notfoundItems
                 // zq_type: '结算类型', // 1:结算清单 2.积分清单
                 // zq_state: '结算状态' //0:没有结算清单,1:结算成功, -1:结算失败
             }
 
-            let jf = []
-            let jf_suss = []
-            let jf_fail = []
             let jf_none = []
-
-            let js = []
-            let js_suss = []
-            let js_fail = []
             let js_none = []
-
-            let result = []
 
             all.forEach(e => {
                 // e.zq_type = e.zq_type == 2 ? '积分结算' : '结算清单'
@@ -719,69 +692,24 @@ export default {
 
                 if (e.zq_type == 2) {
                     e.type = '积分清单'
-                    jf.push(e)
-                    if (e.zq_state == -1) {
-                        e.stat = '结算失败'
-                        jf_fail.push(e)
-                    } else if (e.zq_state == 1) {
-                        e.stat = '结算成功'
-                        jf_suss.push(e)
-                    } else {
-                        e.stat = '未结算'
-                        jf_none.push(e)
-                    }
+                    jf_none.push(e)
                 } else {
                     e.type = '结算清单'
-                    js.push(e)
-                    if (e.zq_state == -1) {
-                        e.stat = '结算失败'
-                        js_fail.push(e)
-                    } else if (e.zq_state == 1) {
-                        e.stat = '结算成功'
-                        js_suss.push(e)
-                    } else {
-                        e.stat = '未结算'
-                        js_none.push(e)
-                    }
+                    js_none.push(e)
                 }
             })
 
-            jf = {
-                datas: this.parseAoaData(jf, json),
-                bookName: '全部积分账期'
-            }
-
-            jf_suss = {
-                datas: this.parseAoaData(jf_suss, json),
-                bookName: '积分（成功）'
-            }
-            jf_fail = {
-                datas: this.parseAoaData(jf_fail, json),
-                bookName: '积分（失败）'
-            }
             jf_none = {
                 datas: this.parseAoaData(jf_none, json),
-                bookName: '积分（未结算）'
+                bookName: '积分未结算'
             }
 
-            js = {
-                datas: this.parseAoaData(js, json),
-                bookName: '全部结算账期'
-            }
-            js_suss = {
-                datas: this.parseAoaData(js_suss, json),
-                bookName: '结算（成功）'
-            }
-            js_fail = {
-                datas: this.parseAoaData(js_fail, json),
-                bookName: '结算（失败）'
-            }
             js_none = {
                 datas: this.parseAoaData(js_none, json),
-                bookName: '结算（未结算）'
+                bookName: '清单未结算'
             }
 
-            return [js, js_suss, js_fail, js_none, jf, jf_suss, jf_fail, jf_none]
+            return [js_none, jf_none]
         },
         fetchSlListsAll() {
             // 查找所有未结算的

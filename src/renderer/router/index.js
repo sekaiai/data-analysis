@@ -66,6 +66,11 @@ export default new Router({
             component: require('@/pages/relate/index.vue').default
         },
         {
+            path: '/zhangqi',
+            name: 'zhangqi',
+            component: require('@/pages/zhangqi/index.vue').default
+        },
+        {
             path: '*',
             redirect: '/'
         }
