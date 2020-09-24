@@ -590,11 +590,11 @@ export default {
         },
         onFetchCount(whereSQL = '') {
             // const sql = 'SELECT COUNT(uuid) AS totalCount from accept ' + whereSQL
-            const sql = `select COUNT(1) from zhangqi zq left join accept a on zq.list_id=a.uuid ` + whereSQL
+            const sql = `select COUNT(1) as total from zhangqi zq left join accept a on zq.list_id=a.uuid ` + whereSQL
             this.$db.get(sql, (err, res) => {
                 if (!err) {
                     console.log(res)
-                    this.total = res.totalCount
+                    this.total = res.total
                 }
             })
         },
