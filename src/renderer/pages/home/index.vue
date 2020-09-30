@@ -562,7 +562,7 @@ export default {
             // 下载受理清单
             this.downSlListLoading = true
 
-            let zq_where = `zq.date=${date}`
+            let zq_where = `${date === '总计' ? true : 'zq.date=' + date}`
 
             // 1.未结算的账期
             // 2.未结算的结算清单

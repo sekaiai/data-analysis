@@ -4,7 +4,13 @@
     v-loading.lock="loading"
     :element-loading-text="`正在导入数据。写入成功${countSuccess}, 写入失败${countError}`"
   >
-    <div class="title-line">关联副卡</div>
+    <div class="title-line">
+      关联副卡
+
+      <el-button @click="deleteAllFuka" style="margin-left: 10px;" type="text" size="mini">
+        删除全部副卡
+      </el-button>
+    </div>
 
     <div class="flex">
       <div class="flex-item">
@@ -70,6 +76,38 @@ export default {
     this.onInit()
   },
   methods: {
+    deleteAllFuka() {
+      this.$confirm('删除后请手动更新数据!', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      })
+        .then(() => {
+          this.$db.run(`delete from related_user`, (err, res) => {
+            console.log(1, err, res)
+            this.$db.run(`update accept set action_r=''`, (err, res) => {
+              console.log('actionr', err, res)
+              if (!err) {
+                this.$notify.success({
+                  duration: 20000,
+                  title: '完成',
+                  message: '数据删除完毕，重新添加数据后请在首页[重新统计]'
+                })
+                this.onInit()
+              } else {
+                this.$notify.error({
+                  duration: 20000,
+                  title: '删除失败',
+                  message: err.message
+                })
+              }
+            })
+          })
+        })
+        .catch(err => {
+          console.log(err)
+        })
+    },
     onSearch() {},
     onInit() {
       this.page = 1
@@ -205,6 +243,7 @@ export default {
           console.log(fks, aps)
 
           aps.forEach(e => {
+            ww
             let _ac = `#${e['action_no']}#`
 
             let _t = fks.find(tt => {

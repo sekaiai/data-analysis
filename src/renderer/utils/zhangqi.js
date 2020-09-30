@@ -58,33 +58,29 @@ group by zq.id
 
             const sqlArr = []
             const sqlArrE = []
+            // 不完美匹配的清单
+            const fake = []
+            // 完美匹配的清单
+            const perf = []
+
             // 更新结算清单
             if (type !== 'jf') {
                 // js_sql start
-                // 先精准匹配user_menber,如果不存在再匹配action_r
+
                 let js_sql = `
-                select a.uuid,a.pgk_id,a.action,jf.id,jf.date,jf.status,jf.user_number
-                from bill jf 
-                left join accept a on a.pgk_id=jf.pgk_id and a.action_no=jf.user_number
-                where a.uuid is not null and jf.flag <>1 and jf.pgk_id ${pgk} GROUP by jf.id
-                `
-                let JS_LIST = await sqlAll(js_sql)
-                if (!JS_LIST.length) {
-                    js_sql = `
                     select a.uuid,a.pgk_id,a.action,jf.id,jf.date,jf.status,jf.user_number
                     from bill jf 
                     left join accept a on a.pgk_id=jf.pgk_id and a.action_r like '%'||jf.user_number||'%'
-                    where a.uuid is not null and jf.flag <>1 and jf.pgk_id ${pgk} GROUP by jf.id
+                    where a.uuid is not null and jf.flag <>1 and jf.pgk_id ${pgk}
                     `
-                    JS_LIST = await sqlAll(js_sql)
-                }
+                let JS_LIST = await sqlAll(js_sql)
 
                 // js_sql end
 
                 // desc， 大的排前面，js结算的时候先把打的结算了。避免小的账期无法结算
                 const zq_js_sql = `select zq.*,a.action_no from zhangqi zq left join accept a on a.uuid=zq.list_id where zq.state !=1 and zq.type!=2 and zq.pgk_id ${pgk} order by zq.date desc`
                 let ZQ_JS_LIST = await sqlAll(zq_js_sql)
-
+                // console.log(JS_LIST, ZQ_JS_LIST)
                 // JS_LIST.forEach(jf => {
                 for (let ii = 0; ii < JS_LIST.length; ii++) {
                     let jf = JS_LIST[ii]
@@ -98,61 +94,79 @@ group by zq.id
                     // 选出所有可用的结算清单，然后匹配取业务号最匹配的
                     let _zqlist = '' //用来存业务号相同的清单
                     let _zqlist2 = '' //用来存业务号相同的清单
-                    for (var i = 0; i < ZQ_JS_LIST.length; i++) {
+                    for (let i = 0; i < ZQ_JS_LIST.length; i++) {
                         let zq = ZQ_JS_LIST[i]
                         let type = jf.action === '新装' ? 1 : 3
                         // 去掉时间匹配
                         // zq.date <= jf.date &&
                         if (zq.list_id === jf.uuid && zq.pgk_id === jf.pgk_id && zq.type === type) {
                             // 取业务号相同的。
-                            if (zq.user_member == jf.action_no) {
+                            // console.log('zq.action_no == jf.user_number', zq.action_no, jf.user_number)
+                            if (zq.action_no == jf.user_number) {
                                 // 取日期最小的
                                 if (!_zqlist2) {
                                     _zqlist2 = { zq, i }
                                 } else if (!_zqlist2.zq.date < zq.date) {
                                     _zqlist2 = { zq, i }
                                 }
-                            } else {
-                                // 取日期最小的
-                                if (!_zqlist) {
-                                    _zqlist = { zq, i }
-                                } else if (!_zqlist.zq.date < zq.date) {
-                                    _zqlist = { zq, i }
-                                }
+                            }
+
+                            // 取日期最小的
+                            if (!_zqlist) {
+                                _zqlist = { zq, i }
+                            } else if (!_zqlist.zq.date < zq.date) {
+                                _zqlist = { zq, i }
                             }
                         }
                     }
+
                     // 取最匹配的。
                     if (_zqlist2) {
-                        _zqlist = _zqlist2
-                    }
-
-                    if (_zqlist) {
+                        let zq = ZQ_JS_LIST.splice(_zqlist.i, 1)[0]
+                        perf.push({ zq_id: zq.id, ...jf, zq_tel: zq.action_no })
+                    } else if (_zqlist) {
                         let zq = _zqlist.zq
-                        // console.log('我是账期', jf.id, zq.id)
-
-                        let state = jf.status | 0
-                        if (state !== 1) {
-                            state = -1
-                        }
-
-                        let upzq = `update zhangqi set state=${state},qd_id='${jf.id}' where id='${zq.id}'`
-                        let upbl = `update bill set flag=1 where id='${jf.id}'`
-
-                        if (state === -1) {
-                            // console.log('sqlArrE', state)
-                            sqlArrE.push(upzq, upbl)
-                        } else {
-                            // 删除数据
-                            // console.log(zq)
-                            ZQ_JS_LIST.splice(_zqlist.i, 1)
-                            sqlArr.push(upzq, upbl)
-                        }
-
-                        // sqlArr.push(runSql(`update zhangqi set state=${state},qd_id='${jf.id}' where id='${zq.id}'`))
-                        // sqlArr.push(runSql(`update bill set flag=1 where id='${jf.id}'`))
+                        fake.push({ zq_id: zq.id, ...jf, zq_tel: zq.action_no })
                     }
+
                     // })
+                }
+            }
+            if (perf.length || fake.length) {
+                // 去除fake中重复
+                // console.log('perf.length && fake.length', perf.length && fake.length, perf, fake)
+                if (perf.length && fake.length) {
+                    for (let i = 0; i < perf.length; i++) {
+                        let { id } = perf[i]
+
+                        for (let j = 0; j < fake.length; j++) {
+                            // console.log(id, fake[j].id)
+                            if (id === fake[j].id) {
+                                fake.splice(j, 1)
+                            }
+                        }
+                    }
+                }
+                const result = [...perf, ...fake]
+
+                for (let i = 0; i < result.length; i++) {
+                    let jf = result[i]
+
+                    let state = jf.status | 0
+                    if (state !== 1) {
+                        state = -1
+                    }
+
+                    let upzq = `update zhangqi set state=${state},qd_id='${jf.id}' where id='${jf.zq_id}'`
+                    let upbl = `update bill set flag=1 where id='${jf.id}'`
+                    if (state === -1) {
+                        // console.log('sqlArrE', state)
+                        sqlArrE.push(upzq, upbl)
+                    } else {
+                        // 删除数据
+                        // console.log(zq)
+                        sqlArr.push(upzq, upbl)
+                    }
                 }
             }
             // console.log(sqlArr)
@@ -592,6 +606,8 @@ const createAcceptSQL = (keys, values) => {
 const createZhangqiSQL = (taocan, accept) => {
     // 获取他套餐信息
     let { id, count_js, count_jf, count_gs, law_jf, law_js, law_gs } = taocan
+
+    // 组装结算规则
     if (!count_js) {
         law_js = []
     } else {

@@ -569,7 +569,10 @@ export default {
                         } else {
                             val = '未结算'
                         }
+                    } else if (k === 'date_end' || k === 'created' || k === 'import_date') {
+                        val = dayjs.unix(val).format('YYYY-MM-DD')
                     }
+
                     return val
                 })
             })

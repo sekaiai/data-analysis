@@ -263,7 +263,7 @@ export default {
 
             return new Promise(resolve => {
                 this.$db.get(sql, async (err, res) => {
-                    console.log('查询的数据', err, res)
+                    // console.log('查询的数据', err, res)
                     if (res && res.id) {
                         // 新装时间一定比改速率靠前
                         const list_id = res.id
@@ -271,13 +271,13 @@ export default {
                         if (acceptItem.action == '新装' || acceptItem.created < res.created) {
                             let dsql = `delete from accept where id = '${list_id}'`
                             this.$db.run(dsql, async (err, res) => {
-                                console.log('删除对应的受理清单', { err, res }) // 删除对应的账期
+                                // console.log('删除对应的受理清单', { err, res }) // 删除对应的账期
                                 this.$db.run(`delete from zhangqi where list_id=${list_id}`, (err, res) => {
-                                    console.log('删除对应的账期完成', err, res)
+                                    // console.log('删除对应的账期完成', err, res)
                                 })
 
                                 let taocan = await fetchTaocanItem2name(acceptItem.product_main)
-                                console.log({ taocan })
+                                // console.log({ taocan })
                                 if (taocan && taocan.id) {
                                     acceptItem.pgk_id = taocan.id
                                 }
@@ -321,10 +321,10 @@ export default {
             const values = Object.values(this.items)
             let arr = []
             const taocanArr = await getAllTaocan()
-            console.log(taocanArr)
+            // console.log(taocanArr)
             const taocanList = []
             const fukaArr = await getAllFuka()
-            console.log(fukaArr)
+            // console.log(fukaArr)
             const zqArr = [] //账期sql arr
             const pgk_ids = new Set()
             // console.log(taocanArr, fukaArr)
@@ -400,7 +400,7 @@ export default {
             // console.log('arr2', arr)
             // runSql2Arr(arr)
             runSql2Arr([...arr, ...zqArr]).then(res => {
-                console.log('runSql2Arr over', res)
+                // console.log('runSql2Arr over', res)
                 this.btntext = '正在查找重复数据'
                 this.$notify.info({
                     duration: 20000,
@@ -408,7 +408,7 @@ export default {
                     message: '开始查找重复数据。'
                 })
                 deleteReplaceData().then(res => {
-                    console.log('重复数据删除完成')
+                    // console.log('重复数据删除完成')
                     this.btntext = '正在更新账期信息'
                     this.onFetchMonthLength()
 
