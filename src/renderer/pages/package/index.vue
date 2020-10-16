@@ -1,6 +1,7 @@
 <template>
     <div id="pgk" v-loading.lock="loading">
         <!-- <div @click="computedZhangqiState2()">computedZhangqiState2</div> -->
+        <div @click="addTaocan2">立即创建</div>
         <div class="title-line" v-if="product_mains.length">
             未添加套餐<el-button @click="fetchDatas" style="margin-left: 10px;" type="text" size="mini">
                 刷新数据
@@ -43,6 +44,39 @@
                         <template v-else>-</template>
                     </template>
                 </el-table-column>
+
+                <el-table-column prop="type" label="结算类型" width="200">
+                    <template slot-scope="props">
+                        <template v-if="props.row.type == 1">
+                            普通结算
+                        </template>
+                        <template v-else>
+                            积分结算
+                        </template>
+                    </template>
+                </el-table-column>
+                <el-table-column prop="fuka" label="关联副卡" width="200">
+                    <template slot-scope="props">
+                        <template v-if="props.row.fuka == 1">
+                            是
+                        </template>
+                        <template v-else>
+                            否
+                        </template>
+                    </template>
+                </el-table-column>
+
+                <el-table-column prop="alias" label="账期规则" width="200">
+                    <template slot-scope="props">
+                        <p v-for="(v, i) in formatRules(props.row.rules)" :key="i">{{ v }}</p>
+                    </template>
+                </el-table-column>
+                <el-table-column prop="alias" label="结算规则" width="200">
+                    <template slot-scope="props">
+                        <p v-for="(v, i) in formatRules(props.row.js_rules)" :key="i">{{ v }}</p>
+                    </template>
+                </el-table-column>
+
                 <!-- <el-table-column prop="__count" label="本月待结算受理数"></el-table-column> -->
                 <!-- <el-table-column prop="__nums" label="本月待受理清单"></el-table-column> -->
                 <el-table-column prop="accept_count" label="统计">
@@ -53,15 +87,6 @@
                 <el-table-column prop="accept_count" label="结算规律">
                     <el-table-column prop="count_js" label="次数"> </el-table-column>
                     <el-table-column prop="law_js" label="规律"> </el-table-column>
-                </el-table-column>
-
-                <el-table-column prop="accept_count" label="积分结算规律">
-                    <el-table-column prop="count_jf" label="次数"> </el-table-column>
-                    <el-table-column prop="law_jf" label="规律"> </el-table-column>
-                </el-table-column>
-                <el-table-column prop="accept_count" label="改数率结算规则">
-                    <el-table-column prop="count_gs" label="次数"> </el-table-column>
-                    <el-table-column prop="law_gs" label="规律"> </el-table-column>
                 </el-table-column>
 
                 <el-table-column fixed="right" label="操作" width="160">
@@ -88,7 +113,7 @@
         <el-dialog
             title="提示"
             :visible.sync="isShowAddTaocan"
-            width="500px"
+            width="800px"
             :before-close="
                 () => {
                     isShowAddTaocan = false
@@ -97,6 +122,20 @@
             @close="isedit = 0"
         >
             <el-form :model="ruleForm" :rules="rules" ref="ruleForm" class="demo-ruleForm">
+                <el-form-item prop="type" label="套餐结算类型">
+                    <el-radio-group v-model="ruleForm['type']">
+                        <el-radio :label="1">普通结算</el-radio>
+                        <el-radio :label="2">积分结算</el-radio>
+                    </el-radio-group>
+                </el-form-item>
+
+                <el-form-item prop="fuka" label="是否关联副卡">
+                    <el-radio-group v-model="ruleForm['fuka']">
+                        <el-radio :label="1">关联</el-radio>
+                        <el-radio :label="2">不关联</el-radio>
+                    </el-radio-group>
+                </el-form-item>
+
                 <el-form-item prop="name" label="发展套餐名称">
                     <div class="taocao-tip">*必须与受理清单表和结算表中的套餐名称一致！</div>
                     <el-input v-model="ruleForm['name']"></el-input>
@@ -110,35 +149,71 @@
                 </ul>
                 <div class="title-line">结算规则</div>
 
-                <el-form-item prop="count_js" label="结算次数（结算清单）">
+                <el-form-item prop="count" label="结算次数（结算清单）">
                     <!-- <el-input v-model="ruleForm['count']"></el-input> -->
                     <div class="el-input">
-                        <el-input-number v-model="ruleForm['count_js']" :min="0"></el-input-number>
+                        <el-input-number v-model="ruleForm['count']" :min="0"></el-input-number>
                     </div>
                 </el-form-item>
-                <el-form-item prop="law_js" label="结算规律（结算清单）">
-                    <el-input v-model="ruleForm['law_js']"></el-input>
-                </el-form-item>
-                <div class="title-line">积分结算规则</div>
-                <el-form-item prop="count_jf" label="结算次数">
-                    <!-- <el-input v-model="ruleForm['count']"></el-input> -->
-                    <div class="el-input">
-                        <el-input-number v-model="ruleForm['count_jf']" :min="0"></el-input-number>
-                    </div>
-                </el-form-item>
-                <el-form-item prop="law_jf" label="结算规律">
-                    <el-input v-model="ruleForm['law_jf']"></el-input>
+                <el-form-item prop="law" label="结算规律（结算清单）">
+                    <el-input v-model="ruleForm['law']"></el-input>
                 </el-form-item>
 
-                <div class="title-line">改数率结算规则</div>
-                <el-form-item prop="count_gs" label="结算次数（改数率）">
-                    <!-- <el-input v-model="ruleForm['count']"></el-input> -->
-                    <div class="el-input">
-                        <el-input-number v-model="ruleForm['count_gs']" :min="0"></el-input-number>
+                <div class="title-line">账期条件</div>
+
+                <el-form-item
+                    label="结算次数"
+                    v-for="(domain, index) in ruleForm.rules"
+                    :label="'条件' + (index + 1)"
+                    :key="domain.key"
+                    :prop="'rules.' + index"
+                >
+                    <div class="flex">
+                        <el-select v-model="domain.k" placeholder="字段">
+                            <el-option :label="k" :value="v" v-for="(k, v) in acceptKeys" :key="k"></el-option>
+                        </el-select>
+
+                        <el-select v-model="domain.c" placeholder="条件" style="width: 80px; ">
+                            <el-option label="等于" value="="></el-option>
+                            <el-option label="大于" value=">"></el-option>
+                            <el-option label="小于" value="<"></el-option>
+                            <el-option label="不等于" value="!"></el-option>
+                        </el-select>
+                        <el-input v-model="domain.v" placeholder="结果" style="width: 220px"></el-input>
+                        <el-button @click.prevent="removeDomain(domain)">删除</el-button>
                     </div>
                 </el-form-item>
-                <el-form-item prop="law_gs" label="结算规律">
-                    <el-input v-model="ruleForm['law_gs']"></el-input>
+                <el-form-item>
+                    <el-button @click="addDomain()">新增条件</el-button>
+                </el-form-item>
+
+                <div class="title-line">结算条件</div>
+                <p>默认条件：结算套餐名称=受理套餐名称，结算用户号码=受理用户号码</p>
+
+                <el-form-item
+                    v-for="(domain, index) in ruleForm.js_rules"
+                    :label="'条件' + (index + 1)"
+                    :key="domain.key"
+                    :prop="'rules.' + index"
+                >
+                    <div class="flex">
+                        <el-select v-model="domain.k" placeholder="字段">
+                            <el-option :label="k" :value="v" v-for="(k, v) in formatKeys" :key="k"></el-option>
+                        </el-select>
+
+                        <el-select v-model="domain.c" placeholder="条件" style="width: 80px; ">
+                            <el-option label="等于" value="="></el-option>
+                            <el-option label="大于" value=">"></el-option>
+                            <el-option label="小于" value="<"></el-option>
+                            <el-option label="不等于" value="!"></el-option>
+                        </el-select>
+                        <el-input v-model="domain.v" placeholder="结果" style="width: 220px"></el-input>
+                        <el-button @click.prevent="removeDomain(domain, 'js')">删除</el-button>
+                    </div>
+                </el-form-item>
+
+                <el-form-item>
+                    <el-button @click="addDomain('js')">新增条件</el-button>
                 </el-form-item>
 
                 <el-form-item prop="law_desc" label="备注信息、结算说明">
@@ -198,6 +273,36 @@ export default {
             }
         }
         return {
+            acceptKeys: {
+                area: '地区',
+                addr: '渠道名称',
+                acceptor: '受理人',
+                product_name: '产品名称',
+                product_type: '角色名称',
+                action: '业务动作',
+                status: '工单状态',
+                user: '揽收人'
+            },
+            jsKeys: {
+                commission_policy: '佣金结算策略',
+                commission_type: '佣金结算类型',
+                product_name: '产品类型',
+                status: '是否成功结算',
+                branch: '网点名称'
+            },
+            jfKeys: {
+                company: '县公司',
+                jf_type: '积分类型',
+                jf_name: '积分规则名称',
+                event_name: '活动名称',
+                xs_id: '销售人员工号',
+                xs_name: '销售人员',
+                md_id: '门店工号',
+                md_code: '门店编码',
+                md_name: '门店名称',
+                cp_type: '产品类型',
+                hyjh: '合约计划'
+            },
             downloadNoneloading: false,
             dialogSelectDate: false,
             zhangqiDate: '',
@@ -208,33 +313,22 @@ export default {
             isShowAddTaocan: false,
             isedit: false, //是否是修改。
             ruleForm: {
+                type: 1,
+                fuka: 2, //是否关联副卡， 1：关联，2：不关联
+                rules: [{ k: 'action', c: '=', v: '新装' }],
+                // 结算规则
+                js_rules: [],
                 name: '', //名称
-                // begin: '', //开始结算月份
-                count_js: 1, //结算次数
-                law_js: '1', //结算规律
-                count_jf: 0, //结算次数
-                law_jf: '1', //结算规律
-                count_gs: 0, //结算次数
-                law_gs: 1, //结算次数
-                law_desc: '' //规律说明
+                count: 1, //结算次数
+                law: '1', //结算规律
+                desc: '' //规律说明
             },
             rules: {
                 name: [{ required: true, message: '请输入发展套餐名称', trigger: 'blur' }],
-                count_js: [{ required: true, message: '请输入结算次数', trigger: 'blur' }],
-                count_jf: [{ required: true, message: '请输入结算次数', trigger: 'blur' }],
-                count_gs: [{ required: true, message: '请输入改数率结算次数', trigger: 'blur' }],
-                law_gs: [
-                    { required: true, message: '请输入改数率结算规律', trigger: 'blur' },
-                    { validator: validatePass }
-                ],
-                law_jf: [
-                    { required: true, message: '请输入结算次数规律', trigger: 'blur' },
-                    { validator: validatePass }
-                ],
-                law_js: [
-                    { required: true, message: '请输入结算次数规律', trigger: 'blur' },
-                    { validator: validatePass }
-                ]
+                count: [{ required: true, message: '请输入结算次数', trigger: 'blur' }],
+                law: [{ required: true, message: '请输入结算规律', trigger: 'blur' }, { validator: validatePass }],
+                fuka: [{ required: true, message: '请选择是否关联副卡' }],
+                type: [{ required: true, message: '请选结算类型' }]
             },
             datas: []
         }
@@ -242,14 +336,40 @@ export default {
     created() {
         this.fetchDatas()
     },
+    watch: {
+        'ruleForm.type'(v) {
+            this.$set(this.ruleForm, 'js_rules', [])
+        }
+    },
     computed: {
         aliasList() {
             const { alias } = this.ruleForm
             return this.formatAlias(alias)
+        },
+
+        formatKeys() {
+            if (this.ruleForm.type === 1) {
+                return this.jsKeys
+            } else {
+                return this.jfKeys
+            }
         }
     },
     methods: {
         computedZhangqiState2,
+        removeDomain(item, js) {
+            let rules = js ? this.ruleForm.js_rules : this.ruleForm.rules
+            let index = rules.indexOf(item)
+
+            if (index !== -1) {
+                rules.splice(index, 1)
+            }
+        },
+        addDomain(key) {
+            if (key === 'js') {
+                this.ruleForm.js_rules.push({ v: '', c: '', k: '' })
+            } else this.ruleForm.rules.push({ v: '', c: '', k: '' })
+        },
         importTaocan(data) {
             console.log(data)
 
@@ -395,18 +515,27 @@ export default {
                 .split(/[\n,]/g)
                 .filter(e => e && e !== 'undefined' && e != 'null')
         },
+        formatRules(rules = '[]') {
+            try {
+                return JSON.parse(rules).map(e => {
+                    return `${this.acceptKeys[e.k]} ${e.c} ${e.v}`
+                })
+            } catch (err) {
+                return []
+            }
+        },
         openAddTaocan(v) {
             // 从tag添加套餐
             this.ruleForm = {
+                type: 1,
+                fuka: 2, //是否关联副卡， 1：关联，2：不关联
+                rules: [{ k: 'action', c: '=', v: '新装' }],
+                // 结算规则
+                js_rules: [],
                 name: v, //名称
-                // begin: '', //开始结算月份
-                count_js: 0, //结算次数
-                law_js: '', //结算规律
-                law_jf: '', //结算规律
-                count_jf: 0, //结算次数
-                count_gs: 0, //结算次数
-                law_gs: 0, //结算次数
-                law_desc: '' //规律说明
+                count: 1, //结算次数
+                law: '1', //结算规律
+                desc: '' //规律说明
             }
             this.isShowAddTaocan = true
         },
@@ -426,11 +555,10 @@ export default {
             })
         },
         editTaocan(datas) {
-            const { name, count, law, law_desc, id } = datas
             // 修改套餐
-            this.isedit = id
+            this.isedit = datas.id
 
-            this.ruleForm = datas
+            this.ruleForm = { ...datas, rules: JSON.parse(datas.rules), js_rules: JSON.parse(datas.js_rules) }
             this.isShowAddTaocan = true
         },
         fetchDatas() {
@@ -464,6 +592,28 @@ export default {
             this.addTaocan2(data, id)
         },
         addTaocan2(__datas, __ID) {
+            __datas = { ...__datas }
+            console.log(__datas)
+            /*         __datas = {
+                name: '5G畅享129元套餐201910', //名称
+                count: 1, //结算次数
+                law: 1, //结算规律
+                type: 1,
+                rules: [{ k: 'product_name', c: '=', v: '移动产品' }],
+                desc: '说明' //规律说明
+            }
+*/
+            /*            let __action = {}
+            if(__datas.type === 1){
+__action = { k: 'action', c: '=', v: '新装' }
+            }else if(__datas.type === 3){
+__action = { k: 'action', c: '=', v: '改速率' }
+*/
+
+            __datas.rules = JSON.stringify(__datas.rules)
+            __datas.js_rules = JSON.stringify(__datas.js_rules)
+
+            // 写入数据库
             return new Promise(reslove => {
                 let sql = ''
                 let isedit = !!__ID
@@ -507,10 +657,18 @@ export default {
                         this.fetchDatas()
                         this.loading = false
                         this.isShowAddTaocan = false
+                        this.ruleForm = {
+                            type: '1',
+                            rules: [{ k: 'action', c: '=', v: '新装' }],
+                            name: '', //名称
+                            count: 1, //结算次数
+                            law: '1', //结算规律
+                            desc: '' //规律说明
+                        }
+
                         reslove()
                         // 更新账期数据
                     }
-                    console.log('addTaocan2', err)
                 })
             })
         },

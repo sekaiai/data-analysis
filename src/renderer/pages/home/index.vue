@@ -428,7 +428,7 @@ export default {
                 md_id: '门店工号',
                 md_code: '门店编码',
                 md_name: '门店名称',
-                cp_type: '产品名称',
+                cp_type: '产品类型',
                 user_id: '用户ID',
                 user_number: '用户号码',
                 xs_instance_id: '销售品实例ID',

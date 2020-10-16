@@ -61,8 +61,8 @@ import {
     runSql2Arr,
     updateAllData,
     deleteReplaceData,
-    computedZhangqiState2
-} from '@/utils/zhangqi'
+    computedZhangqiState3
+} from '@/utils/zhangqi2'
 import { v4 as uuidv4 } from 'uuid'
 
 export default {
@@ -326,9 +326,11 @@ export default {
             const fukaArr = await getAllFuka()
             // console.log(fukaArr)
             const zqArr = [] //账期sql arr
+            // pgk_ids 存储所有套餐的账期
             const pgk_ids = new Set()
             // console.log(taocanArr, fukaArr)
 
+            // 格式化数据，并且插入数据库
             for (var i = this.datas.length - 1; i >= 0; i--) {
                 let item = this.datas[i]
                 let uuid = uuidv4()
@@ -351,39 +353,12 @@ export default {
                         return now
                     } else if (e === 'uuid') {
                         return uuid
-                    } else if (e === 'pgk_id') {
-                        let pgk_id = 0
-                        let t = taocanArr.find(t2 => {
-                            // console.log(t2.val, item['所属主销售品'])
-                            return t2.val.indexOf(`#${item['所属主销售品']}`) > -1
-                        })
-                        if (t) {
-                            pgk_id = t.id
-                            pgk_ids.add(t.id)
-
-                            let date = item['竣工时间'] || item['受理时间']
-                            if (typeof date === 'number') {
-                                date = new Date((date - 25569) * 86400 * 1000)
-                                date = dayjs(date).unix()
-                                // console.log('number date', date, dayjs.unix(date).format('YYYYMM'))
-                            }
-
-                            let a = {
-                                date_end: date,
-                                uuid,
-                                action: item['业务动作']
-                            }
-
-                            zqArr.push(...createZhangqiSQL(t, a))
-                        }
-                        return pgk_id
                     } else if (e === 'action_r') {
-                        let _ac = `#${item['业务号码']}#`
+                        let _ac = `#${item[' ']}#`
 
                         let _t = fukaArr.find(tt => {
                             return tt.indexOf(_ac) > -1
                         })
-                        // console.log('ac,t', _ac, _t)
                         if (_t) _ac = _t
 
                         return _ac
@@ -391,6 +366,61 @@ export default {
                         return item[e] || ''
                     }
                 })
+
+                // 生成账期，以及返回获取账期ID
+                // 筛选出匹配的套餐
+                let taocan = taocanArr.filter(t2 => {
+                    console.log(t2.val, restItem.product_main)
+                    const { id, rules, val } = t2
+
+                    if (t2.val.indexOf(`#${restItem.product_main}`) > -1) {
+                        // 必须包含 rules. 其中一条 action=新装, action和taocan表中的type相同
+                        if (rules.length) {
+                            // rules = [{k: sl_key, c: =, v: sl_val}]
+                            // 判断条件是否对的上，对不上则采用主条件。
+                            let flag = true
+                            for (let ri = 0; ri < rules.length; ri++) {
+                                let { k, c, v } = rules[ri]
+                                if (c === '=') {
+                                    // 如果值不等于，就不匹配
+                                    if (rv !== v) {
+                                        flag = false
+                                    }
+                                } else if (c === '!') {
+                                    // 如果值等于，过滤掉
+                                    if (rv === v) {
+                                        flag = false
+                                    }
+                                } else if (c === '<') {
+                                    if (rv > v) {
+                                        flag = false
+                                    }
+                                } else if (c === '>') {
+                                    if (rv < v) {
+                                        flag = false
+                                    }
+                                }
+                                if (!flag) {
+                                    break
+                                }
+                            }
+                            return flag
+                        } else {
+                            return false
+                        }
+                    }
+                    return false
+                })
+
+                if (taocan.length) {
+                    pgk_ids.add(taocan.id)
+                    restItem.pgk_id = taocan.id
+                    // 生成账期
+                    taocan.forEach(tc => {
+                        zqArr.push(...createZhangqiSQL(tc, restItem))
+                    })
+                }
+
                 arr.push(restItem)
             }
             // console.log('arr1', arr, key)
@@ -419,7 +449,7 @@ export default {
                     })
 
                     // 开始更新账期
-                    computedZhangqiState2(Array.from(pgk_ids)).then(res => {
+                    computedZhangqiState3(Array.from(pgk_ids)).then(res => {
                         this.datas = []
                         this.insertStatus = false
                         this.btntext = '写入完成'
@@ -434,7 +464,7 @@ export default {
                 /*         runSql2Arr(zqArr).then(res => {
                     console.log('添加账期完成', res)
 
-                    
+
                 })*/
             })
 
@@ -473,7 +503,7 @@ export default {
 
             for (var i = this.datas.length - 1; i >= 0; i--) {
                 let item = { ...this.datas[i] }
-                let restitem = values.map(e => {
+                let restItem = values.map(e => {
                     if (e === '竣工时间' || e == '受理时间') {
                         let date = item[e]
                         if (!date) {
@@ -498,12 +528,12 @@ export default {
 
                 // if (i == 1) {
                 // this.$logger(now)
-                // console.log(key, restitem)
+                // console.log(key, restItem)
 
-                let flag = await this.onEachInsert(key, restitem)
+                let flag = await this.onEachInsert(key, restItem)
 
                 let result = {}
-                restitem.forEach((e, i) => {
+                restItem.forEach((e, i) => {
                     result[values[i]] = e
                 })
                 // this.$logger(item.created, item.date_end, _d)

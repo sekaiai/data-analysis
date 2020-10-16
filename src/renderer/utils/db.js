@@ -69,9 +69,6 @@ db.serialize(async () => {
     )
   )
 
-  /*  db.run(`CREATE UNIQUE INDEX u_action_no ON accept (action_no,product_main)`, err => {
-    console.log(err)
-  })*/
   sqlArr.push(runSQL(`CREATE INDEX acc_action_r ON accept (action_r)`))
   sqlArr.push(runSQL(`CREATE INDEX acc_pgk_id ON accept (pgk_id)`))
   sqlArr.push(runSQL(`CREATE INDEX acc_action ON accept (action)`))
@@ -91,6 +88,8 @@ db.serialize(async () => {
    * law_js:   结算清单结算规律
    * law_jf:   积分结算规律
    * law_desc: 结算规律说明
+   * rules_jf: 需要结算的字段
+   * type: 1普通结算，2积分结算
    */
   // db.run(`drop table package`)
 
@@ -100,18 +99,20 @@ db.serialize(async () => {
      id CHAR(32) PRIMARY KEY NOT NULL,
      name VARCHAR(200) NOT NULL,
      alias VARCHAR(500),
-     count_js INTEGER DEFAULT 0 NOT NULL,
-     count_jf INTEGER DEFAULT 0 NOT NULL,
-     count_gs INTEGER DEFAULT 0 NOT NULL,
-     law_gs VARCHAR(255) NOT NULL,
-     law_js VARCHAR(255) NOT NULL,
-     law_jf VARCHAR(255) NOT NULL,
-     law_desc VARCHAR(255)
+     type INTEGER DEFAULT 1 NOT NULL,
+     fuka INTEGER DEFAULT 2 NOT NULL,
+     law VARCHAR(255) NOT NULL,
+     count INTEGER DEFAULT 0 NOT NULL,
+     rules VARCHAR(500),
+     js_rules VARCHAR(500),
+     desc VARCHAR(255)
     )`
     )
   )
+  /*  count_gs INTEGER DEFAULT 0 NOT NULL,
+  law_gs VARCHAR(255) NOT NULL,*/
 
-  sqlArr.push(runSQL(`CREATE UNIQUE INDEX package_name ON pgk (name)`))
+  sqlArr.push(runSQL(`CREATE INDEX pgk_name ON pgk (name)`))
 
   /**
    * 结算表
@@ -161,14 +162,11 @@ db.serialize(async () => {
   )
 
   sqlArr.push(runSQL(`CREATE INDEX bill_flag ON bill (flag)`))
-
   sqlArr.push(runSQL(`CREATE INDEX bill_pgk_id ON bill (pgk_id)`))
-
   sqlArr.push(runSQL(`CREATE INDEX branch_id ON bill (branch_id)`))
   sqlArr.push(runSQL(`CREATE INDEX order_id ON bill (order_id)`))
   sqlArr.push(runSQL(`CREATE INDEX status ON bill (status)`))
   sqlArr.push(runSQL(`create index date ON bill (date)`))
-
   sqlArr.push(runSQL(`create index user_number ON bill (user_number)`))
   sqlArr.push(runSQL(`create index status ON bill (status)`))
   sqlArr.push(runSQL(`create index branch ON bill (branch)`))
@@ -259,13 +257,9 @@ db.serialize(async () => {
         )`
     )
   )
-
   sqlArr.push(runSQL(`CREATE INDEX jifen_flag ON jifen (flag)`))
-
   sqlArr.push(runSQL(`CREATE INDEX jifen_pgk_id ON jifen (pgk_id)`))
-
   sqlArr.push(runSQL(`create index jifen_date ON jifen (date)`))
-
   sqlArr.push(runSQL(`create index jifen_xs_name ON jifen (xs_name)`))
   sqlArr.push(runSQL(`create index jifen_xs_instance_id ON jifen (xs_instance_id)`))
 
@@ -275,6 +269,7 @@ db.serialize(async () => {
      id(自增) | 受理清单ID(list_id) | 套餐ID(pgk_id) | 账期(date)  | 是否已结算(state) |  结算类型(type) |  结算清单ID(qd_id)
      --- | --- | --- | --- | --- | ---
      - | - | - | 202004 | 0:没有结算清单,1:结算成功, -1:结算失败 | 1:结算清单 2.积分清单 | 结算(积分) 清单ID
+     val 里面包含当前结算你需要匹配的值
      */
   sqlArr.push(
     runSQL(
@@ -285,19 +280,17 @@ db.serialize(async () => {
         qd_id INTEGER,
         date INTEGER NOT NULL,
         state INTEGER DEFAULT 0,
-        type INTEGER DEFAULT 1
+        type INTEGER DEFAULT 1,
+        rules VARCHAR(500)
         )`
     )
   )
-
   sqlArr.push(runSQL(`create index zhangqi_qd_id ON zhangqi (qd_id)`))
   sqlArr.push(runSQL(`create index zhangqi_list_id ON zhangqi (list_id)`))
-
   sqlArr.push(runSQL(`create index zhangqi_pgk_id ON zhangqi (pgk_id)`))
-
   sqlArr.push(runSQL(`create index zhangqi_date ON zhangqi (date)`))
-
   sqlArr.push(runSQL(`create index zhangqi_state ON zhangqi (state)`))
+
   await Promise.all(sqlArr)
 
   db.run('COMMIT TRANSACTION;')
