@@ -252,7 +252,7 @@ import {
     importSLNoneJS,
     importJSNoneSL,
     computedZhangqiState2
-} from '@/utils/zhangqi'
+} from '@/utils/zhangqi2'
 import download from '@/utils/download.js'
 import { v4 as uuidv4 } from 'uuid'
 

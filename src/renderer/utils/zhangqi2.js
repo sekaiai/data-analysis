@@ -8,10 +8,7 @@ const updateAllData = async () => {
         DB.all()
     })*/
     const ids = await new Promise(reslove => {
-        sqlAll('select id from pgk').then((res = []) => {
-            const id = res.map(e => e.id)
-            reslove(id)
-        })
+        sqlAll('select * from pgk').then((res = []) => res)
     })
     for (var i = 0; i < ids.length; i++) {
         await TCupdateZQ(ids[i], true)
@@ -25,6 +22,7 @@ const updateAllData = async () => {
 }
 
 const computedZhangqiState3 = async pgk_id => {
+    console.log('computedZhangqiState3', pgk_id)
     let pgk = typeof pgk_id
     if (pgk === 'object') {
         pgk = `in ('${pgk_id.join("','")}')`
@@ -33,6 +31,8 @@ const computedZhangqiState3 = async pgk_id => {
     } else {
         pgk = `!=0`
     }
+
+    console.log('computedZhangqiState3', pgk)
 
     // 1. 先获取所有相关账期
     // 2. 根据账期条件相关结算清单
@@ -63,7 +63,7 @@ const computedZhangqiState3 = async pgk_id => {
 
                 zq.rules = JSON.parse(zq.rules)
                 if (zq.type === 1) {
-                    // 普通结算
+                    // 普通结算, 查找除与结果相匹配的
                     let data = jsLIST.find(e => {
                         let flag = true
                         for (let ri = 0; ri < zq.rules.length; ri++) {
@@ -715,7 +715,7 @@ const createZhangqiSQL = (taocan, accept) => {
     count INTEGER DEFAULT 0 NOT NULL,
     rules VARCHAR(500),
     desc VARCHAR(255)*/
-    let { id, count, law, rules, type } = taocan
+    let { id, count, law, rules, type, fuka } = taocan
 
     if (!count) {
         law = []
@@ -729,7 +729,7 @@ const createZhangqiSQL = (taocan, accept) => {
         })
     }
 
-    let { date_end, created, uuid: accept_id, action } = accept
+    let { date_end, created, uuid: accept_id, action, action_r } = accept
 
     // 转换时间戳为对象
     let date = !date_end ? created : date_end
@@ -745,14 +745,14 @@ const createZhangqiSQL = (taocan, accept) => {
         date = dayjs(date)
             .add(law[i], 'month')
             .format('YYYYMM')
-        let q = getZhangqiSql(accept_id, id, date, type, rules)
+        let q = getZhangqiSql(accept_id, id, date, type, action_r)
         sqlArr.push(q)
     }
 
     return sqlArr
 }
 
-const getZhangqiSql = (accept_id, id, date, type, rules) => {
+const getZhangqiSql = (accept_id, id, date, type, fuka) => {
     /*            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
         list_id CHAR(32) NOT NULL,
         pgk_id CHAR(32) NOT NULL,
@@ -762,7 +762,7 @@ const getZhangqiSql = (accept_id, id, date, type, rules) => {
         type INTEGER DEFAULT 1,
         rules VARCHAR(500)*/
 
-    return `insert into zhangqi (list_id, pgk_id, date, type, rules) values ('${accept_id}','${id}',${date}, ${type}, '${rules}')`
+    return `insert into zhangqi (list_id, pgk_id, date, type, rules) values ('${accept_id}','${id}',${date}, ${type}, ${fuka})`
 }
 
 // 删除重复数据
@@ -938,31 +938,64 @@ const insertZhangqiItem = (accept_id, id, date, type) => {
  * id => 套餐id
  */
 const TCupdateZQ = async (id, isedit = false) => {
-    //1. 删除账期
-    if (isedit) {
-        await deleteZhangqi(id)
+    // 获取套餐详细
+    let taocan = {}
+    let pgk_id = id
+    if (typeof id === 'object') {
+        taocan = { ...id }
+        pgk_id = taocan.id
+    } else {
+        taocan = await fetchTaocanItem(pgk_id)
     }
 
-    // 获取套餐详细
-    let taocan = await fetchTaocanItem(id)
+    //1. 删除账期
+    if (isedit) {
+        await deleteZhangqi(pgk_id)
+    }
 
     // 添加套餐ID
     await addPgkid(taocan, ['bill', 'accept', 'jifen'])
-
+    /*
     // 创建账期sql
-    let accepts = await fetchAcceptLists2pgkid(id)
+    let accepts = await fetchAcceptLists2pgkid(pgk_id)
+    let rule = JSON.parse(taocan.rules)
 
     let sqlArr = []
     for (var i = 0; i < accepts.length; i++) {
-        sqlArr.push(...createZhangqiSQL(taocan, accepts[i]))
+        if (jstcjs(accepts[i], rule)) {
+            sqlArr.push(...createZhangqiSQL(taocan, accepts[i]))
+        }
     }
-    // console.log(sqlArr)
+    console.log(sqlArr, accepts)
 
     // 添加账期
     await runSql2Arr(sqlArr)
 
     // 更新账期，结算表。
-    return computedZhangqiState3(id)
+    return computedZhangqiState3(pgk_id)*/
+    return computedZhangqiState3(pgk_id)
+}
+
+const jstcjs = (sl, rule = '') => {
+    rule = JSON.parse(rule)
+    let flag = true
+    for (let ri = 0; ri < rule.length; ri++) {
+        let { k, c, v } = rule[ri]
+        if (c === '=') {
+            flag = sl[k] == v
+        } else if (c === '<') {
+            flag = sl[k] < v
+        } else if (c === '>') {
+            flag = sl[k] > v
+        } else if (c === '!') {
+            flag = sl[k] != v
+        }
+        if (!flag) {
+            break
+        }
+    }
+    console.log('flag', flag)
+    return flag
 }
 
 // 清单更新 pgk_id
@@ -971,17 +1004,15 @@ const addPgkid = async (taocan = {}, types = []) => {
 
     return new Promise(reslove => {
         let { id, name, alias } = taocan
-        // console.log('addPgkid 1', id, taocan)
         if (!id) return reslove()
 
         alias = formatAlias(alias)
-        // console.log('addPgkid', { taocan, type, alias })
-        // console.log({ alias })
-        DB.serialize(() => {
+
+        DB.serialize(async () => {
             DB.run('BEGIN TRANSACTION;')
 
             let sqlArr = []
-            for (var i = 0; i < types.length; i++) {
+            for (let i = 0; i < types.length; i++) {
                 let clounm_name = types[i] === 'accept' ? 'product_main' : 'package_name'
 
                 let _alias = ''
@@ -995,8 +1026,31 @@ const addPgkid = async (taocan = {}, types = []) => {
                             .join(' or ')
                 }
 
-                let sql = `update ${types[i]} set pgk_id='${id}' where ${clounm_name}='${name}' ${_alias}`
-                sqlArr.push(runSql(sql))
+                // let sql = `update ${types[i]} set pgk_id='${id}' where ${clounm_name}='${name}' ${_alias}`
+                // 获取相关的受理清单和结算清单
+                let sql_list = `select * from ${types[i]} where ${clounm_name}='${name}' ${_alias}`
+                const list = await sqlAll(sql_list)
+
+                console.log('sql_list', sql_list, list)
+
+                for (let i2 = 0; i2 < list.length; i2++) {
+                    if (jstcjs(list[i2], taocan.rules)) {
+                        console.log('we can up', types[i])
+                        if (types[i] === 'accept') {
+                            // 创建账期sql
+                            let zq = await createZhangqiSQL(taocan, list[i2])
+                            sqlArr.push(zq.map(e => runSql(e)))
+                            // sqlArr.push(runSql(createZhangqiSQL(taocan, list[i])))
+                            let _sql = `update accept set pgk_id='${id}' where uuid='${list[i2].uuid}'`
+                            sqlArr.push(runSql(_sql))
+
+                            console.log(zq, _sql)
+                        } else {
+                            let _sql = `update ${types[i]} set pgk_id='${id}' where id=${list[i2].id}`
+                            sqlArr.push(runSql(_sql))
+                        }
+                    }
+                }
             }
 
             Promise.all(sqlArr).then(res => {
@@ -1257,11 +1311,11 @@ const getAllFuka = () => {
             const data = res.map(e => {
                 let val = []
                 for (let n in e) {
-                    if (n !== 'id') {
+                    if (n !== 'id' && e[n]) {
                         val.push(e[n])
                     }
                 }
-                return `#${val.join('#')}#`
+                return val.length > 0 ? `#${val.join('#')}#` : ''
             })
             return reslove(data)
         })
@@ -1271,6 +1325,7 @@ const getAllFuka = () => {
 export {
     runSql2,
     sqlAll,
+    computedZhangqiState3,
     computedZhangqiState2,
     runSql2Arr,
     deleteZhangqi2accept,

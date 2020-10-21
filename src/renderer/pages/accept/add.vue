@@ -354,8 +354,7 @@ export default {
                     } else if (e === 'uuid') {
                         return uuid
                     } else if (e === 'action_r') {
-                        let _ac = `#${item[' ']}#`
-
+                        let _ac = `#${item['业务号码']}#`
                         let _t = fukaArr.find(tt => {
                             return tt.indexOf(_ac) > -1
                         })
@@ -372,6 +371,8 @@ export default {
                 let taocan = taocanArr.filter(t2 => {
                     console.log(t2.val, restItem.product_main)
                     const { id, rules, val } = t2
+
+                    // console.
 
                     if (t2.val.indexOf(`#${restItem.product_main}`) > -1) {
                         // 必须包含 rules. 其中一条 action=新装, action和taocan表中的type相同
@@ -447,7 +448,7 @@ export default {
                         title: '重复数据删除完成！',
                         message: '开始更新账期信息。'
                     })
-
+                    console.log('pgk_ids', Array.from(pgk_ids))
                     // 开始更新账期
                     computedZhangqiState3(Array.from(pgk_ids)).then(res => {
                         this.datas = []

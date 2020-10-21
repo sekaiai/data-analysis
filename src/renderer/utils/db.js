@@ -91,8 +91,8 @@ db.serialize(async () => {
    * rules_jf: 需要结算的字段
    * type: 1普通结算，2积分结算
    */
-  // db.run(`drop table package`)
 
+  // rules VARCHAR(500),
   sqlArr.push(
     runSQL(
       `CREATE TABLE pgk(
@@ -100,10 +100,9 @@ db.serialize(async () => {
      name VARCHAR(200) NOT NULL,
      alias VARCHAR(500),
      type INTEGER DEFAULT 1 NOT NULL,
-     fuka INTEGER DEFAULT 2 NOT NULL,
+     fuka  VARCHAR(500),
      law VARCHAR(255) NOT NULL,
      count INTEGER DEFAULT 0 NOT NULL,
-     rules VARCHAR(500),
      js_rules VARCHAR(500),
      desc VARCHAR(255)
     )`
@@ -269,7 +268,8 @@ db.serialize(async () => {
      id(自增) | 受理清单ID(list_id) | 套餐ID(pgk_id) | 账期(date)  | 是否已结算(state) |  结算类型(type) |  结算清单ID(qd_id)
      --- | --- | --- | --- | --- | ---
      - | - | - | 202004 | 0:没有结算清单,1:结算成功, -1:结算失败 | 1:结算清单 2.积分清单 | 结算(积分) 清单ID
-     val 里面包含当前结算你需要匹配的值
+     rules = {k: key,v:value,c:=} 里面包含当前结算你需要匹配的值
+     fuka //是否关联副卡， 1：关联，2：不关联
      */
   sqlArr.push(
     runSQL(
@@ -281,6 +281,7 @@ db.serialize(async () => {
         date INTEGER NOT NULL,
         state INTEGER DEFAULT 0,
         type INTEGER DEFAULT 1,
+        fuka INTEGER DEFAULT 1,
         rules VARCHAR(500)
         )`
     )

@@ -269,7 +269,7 @@
 import download from '@/utils/download.js'
 import dayjs from 'dayjs'
 import xlsx from 'xlsx'
-import { deleteZhangqi2accept } from '@/utils/zhangqi'
+import { deleteZhangqi2accept } from '@/utils/zhangqi2'
 const fs = require('fs')
 const { readFileSync } = fs
 

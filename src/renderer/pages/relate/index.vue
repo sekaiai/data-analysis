@@ -49,7 +49,7 @@
 <script>
 import fs from 'fs'
 import xlsx from 'xlsx'
-import { runSql2Arr, runSql2, getAllFuka } from '@/utils/zhangqi'
+import { runSql2Arr, runSql2, getAllFuka } from '@/utils/zhangqi2'
 
 export default {
   data() {
@@ -228,22 +228,21 @@ export default {
       // 2. 更新匹配的受理清单
     },
     async updateRelation() {
-      const fks = await getAllFuka()
-
       await new Promise(reslove => {
         this.$db.serialize(async () => {
           this.$db.run('BEGIN TRANSACTION;')
 
+          const fks = await getAllFuka()
           let arr = []
-          const aps = await new Promise(reslove => {
+          /*       const aps = await new Promise(reslove => {
             this.$db.all(`select uuid, action_no from accept`, (err, res = []) => {
               reslove(res)
             })
-          })
+          })*/
+          const aps = await sqlAll(`select uuid, action_no from accept`)
           console.log(fks, aps)
 
           aps.forEach(e => {
-            ww
             let _ac = `#${e['action_no']}#`
 
             let _t = fks.find(tt => {
