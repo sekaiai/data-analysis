@@ -50,18 +50,23 @@ const computedZhangqiState3 = async pgk_id => {
                 DB.run('COMMIT TRANSACTION;')
                 return reslove(true)
             }
-            // 获取所有与套餐相关的结算清单
-            const jsSQL = `select * from bill jf where jf.flag <>1 and jf.pgk_id ${pgk}`
-            const jsLIST = await sqlAll(js_sql)
-            // 获取所有相关积分结算清单。
 
-            const jfSQL = `select * from jifen jf  where jf.flag <>1 and jf.pgk_id ${pgk}`
-            const jfLIST = await sqlAll(js_sql)
+            let jsList = []
+            let jfLIST = []
+            if (zqList[0].type === 1) {
+                // 获取所有与套餐相关的结算清单
+                const jsSQL = `select * from bill jf where jf.flag <>1 and jf.pgk_id ${pgk}`
+                jsLIST = await sqlAll(js_sql)
+                // 获取所有相关积分结算清单。
+            } else {
+                const jfSQL = `select * from jifen jf  where jf.flag <>1 and jf.pgk_id ${pgk}`
+                jfLIST = await sqlAll(js_sql)
+            }
 
             for (let i = 0; i < zqList.length; i++) {
                 let zq = zqList[i]
-
                 zq.rules = JSON.parse(zq.rules)
+
                 if (zq.type === 1) {
                     // 普通结算, 查找除与结果相匹配的
                     let data = jsLIST.find(e => {
@@ -715,7 +720,7 @@ const createZhangqiSQL = (taocan, accept) => {
     count INTEGER DEFAULT 0 NOT NULL,
     rules VARCHAR(500),
     desc VARCHAR(255)*/
-    let { id, count, law, rules, type, fuka } = taocan
+    let { id, count, law, js_rules, rules, type, fuka } = taocan
 
     if (!count) {
         law = []
@@ -729,7 +734,7 @@ const createZhangqiSQL = (taocan, accept) => {
         })
     }
 
-    let { date_end, created, uuid: accept_id, action, action_r } = accept
+    let { date_end, created, uuid: accept_id, action, action_r, action_no } = accept
 
     // 转换时间戳为对象
     let date = !date_end ? created : date_end
@@ -745,14 +750,27 @@ const createZhangqiSQL = (taocan, accept) => {
         date = dayjs(date)
             .add(law[i], 'month')
             .format('YYYYMM')
-        let q = getZhangqiSql(accept_id, id, date, type, action_r)
+
+        // 是否关联副卡，如果fuka=1则关联副卡，使用action_r
+        let _fuka = fuka ? action_r : `#${action_no}#`
+        let q = getZhangqiSql(accept_id, id, date, type, action_r, js_rules)
         sqlArr.push(q)
     }
 
     return sqlArr
 }
 
-const getZhangqiSql = (accept_id, id, date, type, fuka) => {
+/**
+ * 生成账期sql
+ * @param  {[type]} accept_id 受理ID
+ * @param  {[type]} id        套餐ID
+ * @param  {[type]} date      账期
+ * @param  {[type]} type      结算类型
+ * @param  {[type]} fuka      匹配用户号码
+ * @param  {[type]} rules     结算规则
+ * @return {[type]}           [description]
+ */
+const getZhangqiSql = (accept_id, id, date, type, fuka, rules) => {
     /*            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
         list_id CHAR(32) NOT NULL,
         pgk_id CHAR(32) NOT NULL,
@@ -762,7 +780,7 @@ const getZhangqiSql = (accept_id, id, date, type, fuka) => {
         type INTEGER DEFAULT 1,
         rules VARCHAR(500)*/
 
-    return `insert into zhangqi (list_id, pgk_id, date, type, rules) values ('${accept_id}','${id}',${date}, ${type}, ${fuka})`
+    return `insert into zhangqi (list_id, pgk_id, date, type, fuka, rules) values ('${accept_id}','${id}',${date}, ${type}, '${fuka}', '${rules}')`
 }
 
 // 删除重复数据
@@ -1039,7 +1057,7 @@ const addPgkid = async (taocan = {}, types = []) => {
                         if (types[i] === 'accept') {
                             // 创建账期sql
                             let zq = await createZhangqiSQL(taocan, list[i2])
-                            sqlArr.push(zq.map(e => runSql(e)))
+                            sqlArr.push(...zq.map(e => runSql(e)))
                             // sqlArr.push(runSql(createZhangqiSQL(taocan, list[i])))
                             let _sql = `update accept set pgk_id='${id}' where uuid='${list[i2].uuid}'`
                             sqlArr.push(runSql(_sql))

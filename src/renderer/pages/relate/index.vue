@@ -49,7 +49,7 @@
 <script>
 import fs from 'fs'
 import xlsx from 'xlsx'
-import { runSql2Arr, runSql2, getAllFuka } from '@/utils/zhangqi2'
+import { runSql2Arr, runSql2, getAllFuka, sqlAll } from '@/utils/zhangqi2'
 
 export default {
   data() {

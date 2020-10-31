@@ -104,6 +104,7 @@ db.serialize(async () => {
      law VARCHAR(255) NOT NULL,
      count INTEGER DEFAULT 0 NOT NULL,
      js_rules VARCHAR(500),
+     rules VARCHAR(500),
      desc VARCHAR(255)
     )`
     )
@@ -281,7 +282,7 @@ db.serialize(async () => {
         date INTEGER NOT NULL,
         state INTEGER DEFAULT 0,
         type INTEGER DEFAULT 1,
-        fuka INTEGER DEFAULT 1,
+        fuka VARCHAR(500),
         rules VARCHAR(500)
         )`
     )
