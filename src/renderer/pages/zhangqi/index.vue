@@ -287,9 +287,8 @@ export default {
             datas: [],
             zq_types: '',
             zq_types_arr: [
-                { i: 1, v: '新装清单' },
-                { i: 2, v: '积分清单' },
-                { i: 3, v: '改数率清单' }
+                { i: 1, v: '普通清单' },
+                { i: 2, v: '积分清单' }
             ],
             status: '',
             status_arr: [
@@ -552,7 +551,14 @@ export default {
                 })
         },
         parseAoaData(items) {
-            const cloums = { qd_id: '清单ID', date: '账期', zq_type: '账期类型', zq_state: '账期状态', ...this.items }
+            const cloums = {
+                qd_id: '结算清单ID',
+                pgk_id: '套餐ID',
+                date: '账期',
+                zq_type: '账期类型',
+                zq_state: '账期状态',
+                ...this.items
+            }
             const line1 = Object.values(cloums)
             const keys = Object.keys(cloums)
 

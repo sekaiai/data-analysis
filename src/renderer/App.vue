@@ -1,6 +1,6 @@
 <template>
     <div id="app" class="flex">
-        <el-menu class="menu-vertical" default-active="1" :router="true" :collapse="true" background-color="#545c64">
+        <el-menu class="menu-vertical" default-active="1" :router="true" background-color="#545c64" color="#fff">
             <el-menu-item index="1">
                 <i class="el-icon-c-scale-to-original"></i>
                 <span slot="title">结算分析</span>
@@ -55,7 +55,9 @@ body,
 body {
     color: #333;
 }
-
+.el-menu-item {
+    color: #eee;
+}
 #app {
     display: flex;
     width: 100%;

@@ -1,6 +1,6 @@
 <template>
     <div id="home-add" v-loading.lock="loading" element-loading-text="正在解析数据">
-        <div @click="updateAllData">删除重复</div>
+        <!-- <div @click="updateAllData">删除重复</div> -->
         <div class="title-line shrink0">导入受理清单</div>
         <div style="margin-bottom: 20px">本月已导入{{ monthLength }}条数据</div>
         <div class="form-line">
@@ -61,6 +61,7 @@ import {
     runSql2Arr,
     updateAllData,
     deleteReplaceData,
+    setSLPGKID,
     computedZhangqiState3
 } from '@/utils/zhangqi2'
 import { v4 as uuidv4 } from 'uuid'
@@ -84,6 +85,9 @@ export default {
             success: [], //成功的列表
             page: 1, //当前页
             showItem: ['购物车流水号', '地区', '渠道名称', '受理人', '产品名称', '所属主销售品', '业务号码', '揽收人'],
+
+            // action_r VARCHAR(255),
+
             items: {
                 uuid: 'uuid',
                 pgk_id: 'pgk_id',
@@ -102,7 +106,9 @@ export default {
                 date_end: '竣工时间',
                 user: '揽收人',
                 remark: '备注',
-                import_date: '导入时间'
+                import_date: '导入时间',
+                user_number: '业务号码',
+                action_r: '关联副卡'
             }
         }
     },
@@ -317,25 +323,17 @@ export default {
             this.insertStatus = true
             const now = dayjs().unix()
 
-            const key = Object.keys(this.items)
-            const values = Object.values(this.items)
-            let arr = []
-            const taocanArr = await getAllTaocan()
-            // console.log(taocanArr)
-            const taocanList = []
             const fukaArr = await getAllFuka()
-            // console.log(fukaArr)
-            const zqArr = [] //账期sql arr
-            // pgk_ids 存储所有套餐的账期
-            const pgk_ids = new Set()
-            // console.log(taocanArr, fukaArr)
+            let items = []
 
             // 格式化数据，并且插入数据库
             for (var i = this.datas.length - 1; i >= 0; i--) {
                 let item = this.datas[i]
                 let uuid = uuidv4()
+                let _item = {}
 
-                let restItem = values.map(e => {
+                for (let x in this.items) {
+                    let e = this.items[x]
                     let v = item[e]
 
                     if (e === '竣工时间' || e === '受理时间') {
@@ -346,91 +344,29 @@ export default {
                         if (typeof v === 'number') {
                             v = new Date((v - 25569) * 86400 * 1000)
                         }
-
                         v = dayjs(v).unix()
-                        return isNaN(v) ? 0 : v
+                        _item[x] = isNaN(v) ? 0 : v
                     } else if (e === '导入时间') {
-                        return now
+                        _item.import_date = now
                     } else if (e === 'uuid') {
-                        return uuid
-                    } else if (e === 'action_r') {
-                        let _ac = `#${item['业务号码']}#`
+                        _item.uuid = uuid
+                    } else if (e === '关联副卡') {
+                        let _fuka = `#${item['业务号码']}#`
                         let _t = fukaArr.find(tt => {
-                            return tt.indexOf(_ac) > -1
+                            return tt.indexOf(_fuka) > -1
                         })
-                        if (_t) _ac = _t
-
-                        return _ac
+                        if (_t) _fuka = _t
+                        _item.action_r = _fuka
                     } else {
-                        return item[e] || ''
+                        _item[x] = v
                     }
-                })
-
-                // 生成账期，以及返回获取账期ID
-                // 筛选出匹配的套餐
-                let taocan = taocanArr.filter(t2 => {
-                    console.log(t2.val, restItem.product_main)
-                    const { id, rules, val } = t2
-
-                    // console.
-
-                    if (t2.val.indexOf(`#${restItem.product_main}`) > -1) {
-                        // 必须包含 rules. 其中一条 action=新装, action和taocan表中的type相同
-                        if (rules.length) {
-                            // rules = [{k: sl_key, c: =, v: sl_val}]
-                            // 判断条件是否对的上，对不上则采用主条件。
-                            let flag = true
-                            for (let ri = 0; ri < rules.length; ri++) {
-                                let { k, c, v } = rules[ri]
-                                if (c === '=') {
-                                    // 如果值不等于，就不匹配
-                                    if (rv !== v) {
-                                        flag = false
-                                    }
-                                } else if (c === '!') {
-                                    // 如果值等于，过滤掉
-                                    if (rv === v) {
-                                        flag = false
-                                    }
-                                } else if (c === '<') {
-                                    if (rv > v) {
-                                        flag = false
-                                    }
-                                } else if (c === '>') {
-                                    if (rv < v) {
-                                        flag = false
-                                    }
-                                }
-                                if (!flag) {
-                                    break
-                                }
-                            }
-                            return flag
-                        } else {
-                            return false
-                        }
-                    }
-                    return false
-                })
-
-                if (taocan.length) {
-                    pgk_ids.add(taocan.id)
-                    restItem.pgk_id = taocan.id
-                    // 生成账期
-                    taocan.forEach(tc => {
-                        zqArr.push(...createZhangqiSQL(tc, restItem))
-                    })
                 }
-
-                arr.push(restItem)
+                items.push(_item)
             }
-            // console.log('arr1', arr, key)
 
-            // 生成插入受理清单sql
-            arr = createAcceptSQL(key, arr)
-            // console.log('arr2', arr)
+            console.log('items', items)
             // runSql2Arr(arr)
-            runSql2Arr([...arr, ...zqArr]).then(res => {
+            setSLPGKID(items).then(pgk_ids => {
                 // console.log('runSql2Arr over', res)
                 this.btntext = '正在查找重复数据'
                 this.$notify.info({
@@ -448,9 +384,9 @@ export default {
                         title: '重复数据删除完成！',
                         message: '开始更新账期信息。'
                     })
-                    console.log('pgk_ids', Array.from(pgk_ids))
+                    console.log('pgk_ids', pgk_ids)
                     // 开始更新账期
-                    computedZhangqiState3(Array.from(pgk_ids)).then(res => {
+                    computedZhangqiState3(pgk_ids).then(res => {
                         this.datas = []
                         this.insertStatus = false
                         this.btntext = '写入完成'
@@ -461,101 +397,6 @@ export default {
                         })
                     })
                 })
-
-                /*         runSql2Arr(zqArr).then(res => {
-                    console.log('添加账期完成', res)
-
-
-                })*/
-            })
-
-            // console.log('zqArr', zqArr)
-
-            // 批量插入数据
-
-            /*      this.onFetchMonthLength()
-            SLinsertZhangqi(max_id).then(res => {
-                this.insertStatus = false
-                console.log('SLinsertZhangqixxxxxxxxx', res)
-            })*/
-        },
-        async handleInsertData(e) {
-            // return false
-
-            if (this.insertStatus) return
-            this.insertStatus = true
-            // const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
-            const now = dayjs().unix()
-
-            const key = Object.keys(this.items).join(',')
-            const values = Object.values(this.items)
-
-            /**
-            更新账期
-            1. 查询出最大ID
-            2.
-            **/
-            let max_id = await new Promise(resolve => {
-                this.$db.get(`select id from accept order by id desc limit 1`, (err, res) => {
-                    let id = (res && res.id) | 0
-                    resolve(id)
-                })
-            })
-
-            for (var i = this.datas.length - 1; i >= 0; i--) {
-                let item = { ...this.datas[i] }
-                let restItem = values.map(e => {
-                    if (e === '竣工时间' || e == '受理时间') {
-                        let date = item[e]
-                        if (!date) {
-                            // const fromat_date = ['YYYY/M/D HH:mm:ss', 'YYYY-M-D HH:mm:ss']
-                            // date = dayjs(item['受理时间'], fromat_date).unix()
-                            date = item['受理时间']
-                        }
-                        // excel的时间格式是number
-                        if (typeof date === 'number') {
-                            date = new Date((date - 25569) * 86400 * 1000)
-                            // console.log(date)
-                        }
-
-                        date = dayjs(date).unix()
-                        return isNaN(date) ? 0 : date
-                    } else if (e == '导入时间') {
-                        return now
-                    } else {
-                        return item[e] || ''
-                    }
-                })
-
-                // if (i == 1) {
-                // this.$logger(now)
-                // console.log(key, restItem)
-
-                let flag = await this.onEachInsert(key, restItem)
-
-                let result = {}
-                restItem.forEach((e, i) => {
-                    result[values[i]] = e
-                })
-                // this.$logger(item.created, item.date_end, _d)
-                // _d=null 则成功。反之返回错误信息
-                // data.push({...this.datas[i], isok: !_d})
-                if (!flag) {
-                    this.success.push(result)
-                } else {
-                    flag = flag.toString()
-                    if (/UNIQUE/i.test(flag)) {
-                        flag = '业务号码已存在'
-                    }
-                    result['失败原因'] = flag
-
-                    this.error.push(result)
-                }
-            }
-            this.onFetchMonthLength()
-            SLinsertZhangqi(max_id).then(res => {
-                this.insertStatus = false
-                // console.log('SLinsertZhangqixxxxxxxxx', res)
             })
         }
     }

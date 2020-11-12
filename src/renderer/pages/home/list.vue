@@ -15,7 +15,13 @@
                 </el-select>
             </div>
             <div class="flex-item">
-                <div class="title">状态</div>
+                <div class="title">清单结算状态</div>
+                <el-select v-model="flag" placeholder="状态" filterable>
+                    <el-option :label="v.v" :value="v.i" v-for="(v, i) in flag_arr" :key="i"></el-option>
+                </el-select>
+            </div>
+            <div class="flex-item">
+                <div class="title">是否成功结算</div>
                 <el-select v-model="status" placeholder="状态" filterable>
                     <el-option :label="v.v" :value="v.i" v-for="(v, i) in status_arr" :key="i"></el-option>
                 </el-select>
@@ -112,8 +118,19 @@
                             </el-form>
                         </template>
                     </el-table-column>
-                    <el-table-column v-for="(v, i) in columns" :key="i" :prop="i" :label="v"> </el-table-column>
-                    <!-- <el-table-column prop="no" label="购物车流水号"> </el-table-column> -->
+                    <!-- <el-table-column v-for="(v, i) in columns" :key="i" :prop="i" :label="v"> </el-table-column> -->
+                    <el-table-column prop="date" label="账期"> </el-table-column>
+                    <el-table-column prop="flag" label="清单结算状态">
+                        <template slot-scope="scope"> {{ scope.row.flag > 0 ? '已结算' : '未结算' }} </template>
+                    </el-table-column>
+                    <el-table-column prop="package_name" label="套餐名称"> </el-table-column>
+                    <el-table-column prop="product_name" label="产品名称"> </el-table-column>
+                    <el-table-column prop="user_id" label="用户ID"> </el-table-column>
+                    <el-table-column prop="user_number" label="用户号码"> </el-table-column>
+                    <el-table-column prop="status" label="是否成功结算">
+                        <template slot-scope="scope"> {{ scope.row.flag > 0 ? '成功' : '失败' }} </template>
+                    </el-table-column>
+                    <el-table-column prop="branch" label="网点"> </el-table-column>
                 </el-table>
             </template>
         </div>
@@ -148,6 +165,11 @@ export default {
                 { i: 1, v: '结算成功' },
                 { i: 0, v: '结算失败' }
             ],
+            flag: '',
+            flag_arr: [
+                { i: 1, v: '已结算' },
+                { i: 0, v: '未结算' }
+            ],
             date: '', //账期
             created: '', //创建时间
             branch: '', //网点
@@ -157,20 +179,13 @@ export default {
             order_id: '', //订单号码
             columns: {
                 date: '账期',
-                // order_id: '订单号',
-                // complete_date: '竣工时间',
-                // commission_policy: '佣金结算策略',
-                // commission_type: '佣金结算类型',
-                // commission_money: '佣金金额',
                 package_name: '套餐名称',
                 product_name: '产品名称',
                 user_id: '用户ID',
                 user_number: '用户号码',
-                status: '是否结算成功',
-                // cause: '原因',
-                // not_found_user: '没有找到业务ID',
+                status: '清单状态',
+                flag: '结算状态',
                 branch: '网点'
-                // created: '写入时间'
             }
         }
     },
@@ -233,6 +248,7 @@ export default {
                 // this.datas = res
                 if (res && res.length > 0) {
                     let json = {
+                        flag: '结算状态',
                         date: '账期',
                         order_id: '订单号',
                         complete_date: '订单竣工时间',
@@ -295,6 +311,8 @@ export default {
                         }
                     } else if (k === 'status') {
                         return v[k] > 0 ? '成功' : '失败'
+                    } else if (k === 'flag') {
+                        return v[k] > 0 ? '成功' : '失败'
                     } else if (k === 'acno') {
                         return !!v[k] ? '成功' : '失败'
                     }
@@ -317,6 +335,9 @@ export default {
             // 按条件查询查询
             if (this.status !== '') {
                 where.push(`b.status='${this.status}'`)
+            }
+            if (this.flag !== '') {
+                where.push(`b.flag='${this.flag}'`)
             }
             if (this.date && this.date !== '') {
                 let a = dayjs(this.date).format('YYYYMM')

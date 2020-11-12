@@ -81,14 +81,13 @@ db.serialize(async () => {
   /**
    * 结算规则表 package
    * name: 套餐名称
-   * count_js： 结算结算次数
-   * count_jf： 积分结算次数
-   * count_gs: 改数率结算次数
-   * law_gs:   改数率结算规律
-   * law_js:   结算清单结算规律
-   * law_jf:   积分结算规律
-   * law_desc: 结算规律说明
-   * rules_jf: 需要结算的字段
+   * count： 结算结算次数
+   * law:   结算规律
+   * desc: 结算规律说明
+   * fuka 是否关联副卡
+   * type: 结算类型，普通结算和 积分结算
+   * js_rules: 结算规则 json
+   * rules 结算规则
    * type: 1普通结算，2积分结算
    */
 

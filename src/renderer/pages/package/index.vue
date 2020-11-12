@@ -1,7 +1,7 @@
 <template>
     <div id="pgk" v-loading.lock="loading">
         <!-- <div @click="computedZhangqiState2()">computedZhangqiState2</div> -->
-        <div @click="addTaocan2">立即创建</div>
+        <!-- <div @click="addTaocan2">立即创建</div> -->
         <div class="title-line" v-if="product_mains.length">
             未添加套餐<el-button @click="fetchDatas" style="margin-left: 10px;" type="text" size="mini">
                 刷新数据
@@ -30,7 +30,7 @@
                     <template slot-scope="props">
                         <div class="flex-item">
                             <div class="title">结算说明</div>
-                            <div class="desc">{{ props.row.law_desc || '-' }}</div>
+                            <div class="desc">{{ props.row.desc || '-' }}</div>
                         </div>
                     </template>
                 </el-table-column>
@@ -45,7 +45,7 @@
                     </template>
                 </el-table-column>
 
-                <el-table-column prop="type" label="结算类型" width="200">
+                <el-table-column prop="type" label="结算类型" width="80">
                     <template slot-scope="props">
                         <template v-if="props.row.type == 1">
                             普通结算
@@ -55,7 +55,7 @@
                         </template>
                     </template>
                 </el-table-column>
-                <el-table-column prop="fuka" label="关联副卡" width="200">
+                <el-table-column prop="fuka" label="关联副卡" width="80">
                     <template slot-scope="props">
                         <template v-if="props.row.fuka == 1">
                             是
@@ -66,30 +66,35 @@
                     </template>
                 </el-table-column>
 
-                <el-table-column prop="alias" label="账期规则" width="200">
+                <el-table-column prop="alias" label="账期规则" width="180">
                     <template slot-scope="props">
                         <p v-for="(v, i) in formatRules(props.row.rules)" :key="i">{{ v }}</p>
                     </template>
                 </el-table-column>
-                <el-table-column prop="alias" label="结算规则" width="200">
+                <el-table-column prop="alias" label="结算规则" width="180">
                     <template slot-scope="props">
-                        <p v-for="(v, i) in formatRules(props.row.js_rules)" :key="i">{{ v }}</p>
+                        <p
+                            v-for="(v, i) in formatRules(props.row.js_rules, props.row.type == 1 ? 'js' : 'jf')"
+                            :key="i"
+                        >
+                            {{ v }}
+                        </p>
                     </template>
                 </el-table-column>
 
                 <!-- <el-table-column prop="__count" label="本月待结算受理数"></el-table-column> -->
                 <!-- <el-table-column prop="__nums" label="本月待受理清单"></el-table-column> -->
-                <el-table-column prop="accept_count" label="统计">
-                    <el-table-column prop="accept_count" label="需要结算"></el-table-column>
+                <el-table-column label="统计">
+                    <el-table-column label="需要结算">
+                        <template slot-scope="props">
+                            {{ props.row.yjs * 1 + props.row.wjs * 1 }}
+                        </template>
+                    </el-table-column>
                     <el-table-column prop="yjs" label="已结算"></el-table-column>
+                    <el-table-column prop="wjs" label="未结算"></el-table-column>
                 </el-table-column>
 
-                <el-table-column prop="accept_count" label="结算规律">
-                    <el-table-column prop="count_js" label="次数"> </el-table-column>
-                    <el-table-column prop="law_js" label="规律"> </el-table-column>
-                </el-table-column>
-
-                <el-table-column fixed="right" label="操作" width="160">
+                <el-table-column fixed="right" label="操作" width="100">
                     <template slot-scope="scope">
                         <el-button @click.native.prevent="deleteTaocan(scope.row.id)" type="text" size="small">
                             删除
@@ -103,7 +108,7 @@
                             type="text"
                             size="small"
                         >
-                            导出出错数据
+                            导出未结算数据
                         </el-button>
                     </template>
                 </el-table-column>
@@ -216,8 +221,8 @@
                     <el-button @click="addDomain('js')">新增条件</el-button>
                 </el-form-item>
 
-                <el-form-item prop="law_desc" label="备注信息、结算说明">
-                    <el-input v-model="ruleForm['law_desc']" type="textarea"></el-input>
+                <el-form-item prop="desc" label="备注信息、结算说明">
+                    <el-input v-model="ruleForm['desc']" type="textarea"></el-input>
                 </el-form-item>
                 <el-form-item>
                     <el-button type="primary" @click="submitForm('ruleForm')">立即创建</el-button>
@@ -371,13 +376,13 @@ export default {
             } else this.ruleForm.rules.push({ v: '', c: '', k: '' })
         },
         importTaocan(data) {
-            console.log(data)
+            // console.log(data)
 
             let fileList = this.$electron.remote.dialog.showOpenDialog({
                 properties: ['openFile'],
                 filters: { name: 'xlsx', extensions: ['xlsx', 'xls'] }
             })
-            console.log(fileList)
+            // console.log(fileList)
 
             if (!fileList || !fileList[0]) {
                 return
@@ -398,59 +403,106 @@ export default {
             // 分析数据
             const fun = []
 
+            /* name: 套餐名称
+             * count： 结算结算次数
+             * law:   结算规律
+             * desc: 结算规律说明
+             * fuka 是否关联副卡
+             * type: 结算类型，普通结算和 积分结算
+             * js_rules: 结算规则 json
+             * rules 结算规则
+             * type: 1普通结算，2积分结算
+             */
+
             const field = {
                 name: '套餐名',
                 alias: '套餐别名',
-                count_js: '结算次数',
-                law_js: '结算规律',
-                count_jf: '积分结算次数',
-                law_jf: '积分结算规律',
-                count_gs: '改数率结算次数',
-                law_gs: '改数率结算规律',
-                law_desc: '备注'
+                count: '结算次数',
+                law: '结算规律',
+                desc: '备注',
+                fuka: '关联副卡',
+                type: '结算类型',
+                rules: '账期规则',
+                js_rules: '结算规则'
             }
+
             let key = result.SheetNames[0]
 
             let json = xlsx.utils.sheet_to_json(result.Sheets[key])
             let _field = { ...field }
-            console.log({ json })
-            const pgk_name = []
             for (var i = 0; i < json.length; i++) {
                 let obj = {}
                 let e = json[i]
                 for (let k in _field) {
-                    // console.log({ k, v: _field[k], e })
                     let v = e[_field[k]]
+                    // console.log('xxxxxxxxxxxxxxxxxxxxxxxx', e)
                     if (v === undefined && k === 'name') {
                         continue
                     }
-                    if (k === 'name') {
-                        pgk_name.push(v)
+
+                    if (!v || v === undefined) {
+                        if (k === 'fuka') {
+                            v = 1
+                        } else if (k === 'count') {
+                            v = 0
+                        }
                     }
-                    if (v === undefined && k !== 'law_desc' && k !== 'alias') {
-                        v = 0
-                    }
-                    if (k === 'law_js' || k === 'law_gs' || k === 'law_jf') {
+                    if (k === 'law') {
                         v = String(v).replace(/，/, ',')
+                    } else if (k === 'js_rules' || k === 'rules') {
+                        let _v = []
+                        v.split('||').forEach(e2 => {
+                            // ["a=b", "a", "=", "b", index: 0, input: "a=b"]
+                            // [{ k: 'action', c: '=', v: '新装' }]
+                            // acceptKeys
+                            let _type = e['结算类型']
+                            let x2 = e2.match(/(.+)(=|>|<|!)(.+)/)
+                            let acc = {}
+                            if (k === 'rules') {
+                                var obj = this.acceptKeys
+                                for (let x in obj) {
+                                    acc[obj[x]] = x
+                                }
+                            } else {
+                                var obj = {}
+                                if (_type == 1) {
+                                    obj = this.jsKeys
+                                } else {
+                                    obj = this.jfKeys
+                                }
+                                for (let x in obj) {
+                                    acc[obj[x]] = x
+                                }
+                            }
+                            // console.log(acc[x2[1]], x2[1], acc)
+                            if (x2 && x2[3]) {
+                                _v.push({ k: acc[x2[1]], c: x2[2], v: x2[3] })
+                            }
+                        })
+                        v = _v
+                        // console.log('---------------', v)
                     }
 
                     obj[k] = v || ''
                 }
+                // 判断重复
                 await new Promise(reslove => {
-                    const sql = `select id from pkg where name='${obj.name}'`
+                    const sql = `select id from pkg where name='${obj.name}' && rules='${obj.rules}'`
                     this.$db.get(sql, (err, res) => {
                         if (res && res.id) {
                             obj.id = res.id
                         }
+                        // console.log('obj', obj)
                         fun.push(obj)
                         reslove()
                     })
                 })
             }
-            console.log(fun)
+            // console.log(fun)
             for (var i = 0; i < fun.length; i++) {
                 await this.addTaocan2(fun[i], fun[i].id)
             }
+
             // this.addTaocan2(field, id)
             // pgk_name
 
@@ -472,25 +524,19 @@ export default {
             this.zhangqiDate = ''
         },
         async importNoneDatas() {
-            let { id, name } = this.selectRow
-            /*            this.selectPGK_ID = row.id
-            this.selectRow = row
-            this.dialogSelectDate = true
-        },
-         importNoneDatasHelp() {
-            const id = this.selectPGK_ID*/
+            let { id, name, type } = this.selectRow
             let date = false
             if (this.zhangqiDate) {
                 date = dayjs(this.zhangqiDate).format('YYYYMM')
                 name += ' ' + date
             }
-            console.log(id, name, date)
+            // console.log(id, name, date)
 
             const sl = await importSLNoneJS(id, date)
-            const js = await importJSNoneSL(id, date)
+            const js = await importJSNoneSL(id, type, date)
 
             const datas = [
-                { bookName: '未受理的结算清单', datas: js },
+                { bookName: '未结算的结算清单', datas: js },
                 { bookName: '未结算的受理清单', datas: sl }
             ]
             // console.log(datas)
@@ -515,10 +561,18 @@ export default {
                 .split(/[\n,]/g)
                 .filter(e => e && e !== 'undefined' && e != 'null')
         },
-        formatRules(rules = '[]') {
+        formatRules(rules = '[]', type = 'accept') {
             try {
                 return JSON.parse(rules).map(e => {
-                    return `${this.acceptKeys[e.k]} ${e.c} ${e.v}`
+                    let k = ''
+                    if (type === 'accept') {
+                        k = this.acceptKeys[e.k]
+                    } else if (type === 'js') {
+                        k = this.jsKeys[e.k]
+                    } else if (type === 'jf') {
+                        k = this.jfKeys[e.k]
+                    }
+                    return `${k} ${e.c} ${e.v}`
                 })
             } catch (err) {
                 return []
@@ -563,10 +617,10 @@ export default {
         },
         fetchDatas() {
             const sql =
-                'select p.*,(select count(z.id) from zhangqi z where pgk_id=p.id) as accept_count,(select count(z.id) from zhangqi z where z.pgk_id=p.id and z.state=1) as yjs from pgk p'
+                'select p.*,(select count(z.id) from zhangqi z where pgk_id=p.id and z.state=0) as wjs,(select count(z.id) from zhangqi z where z.pgk_id=p.id and z.state=1) as yjs from pgk p'
 
             this.$db.all(sql, (err, res) => {
-                console.log('fetchDatas', err, res)
+                // console.log('fetchDatas', err, res)
                 if (!err) {
                     this.datas = res
                     this.getTaocan(res)
@@ -593,7 +647,7 @@ export default {
         },
         addTaocan2(__datas, __ID) {
             __datas = { ...__datas }
-            console.log(__datas)
+            console.log('__datas', __datas)
             /*         __datas = {
                 name: '5G畅享129元套餐201910', //名称
                 count: 1, //结算次数
@@ -630,7 +684,7 @@ __action = { k: 'action', c: '=', v: '改速率' }
                         }
                     }
                     params = params.join(',')
-                    console.log('params', params)
+                    // console.log('params', params)
                     sql = `update pgk set ${params} where id='${__ID}'`
                 } else {
                     // 不存在，创建新套餐
@@ -639,12 +693,13 @@ __action = { k: 'action', c: '=', v: '改速率' }
                     const keys = Object.keys(__datas)
                     const values = Object.values(__datas).join(`','`)
                     sql = `INSERT INTO pgk (${keys}) VALUES ('${values}')`
-                    console.log(sql, keys)
+                    // console.log(sql, keys)
                 }
+                console.log(1, '开始拆入套餐')
                 this.loading = true
                 this.$db.run(sql, async (err, res) => {
                     if (err) {
-                        console.log('addTaocan', err)
+                        console.error('addTaocan', err)
                         this.loading = false
 
                         this.$message({
@@ -653,6 +708,8 @@ __action = { k: 'action', c: '=', v: '改速率' }
                         })
                         reslove()
                     } else {
+                        console.log(2, '开始更新账期')
+
                         await TCupdateZQ(__ID, isedit)
                         this.fetchDatas()
                         this.loading = false
@@ -692,7 +749,7 @@ __action = { k: 'action', c: '=', v: '改速率' }
                 type: 'warning'
             }).then(() => {
                 this.$db.all(`select id from pgk`, async (err, res = []) => {
-                    console.log('select id from pgk', res)
+                    // console.log('select id from pgk', res)
                     for (var i = 0; i < res.length; i++) {
                         await deleteZhangqi(res[i].id)
                     }
@@ -709,11 +766,11 @@ __action = { k: 'action', c: '=', v: '改速率' }
                 type: 'warning'
             })
                 .then(() => {
-                    console.log(id)
+                    // console.log(id)
                     // const { id } = this.datas[index]
                     const sql = `delete from pgk where id =?`
                     this.$db.run(sql, id, (err, res) => {
-                        console.log(err, res)
+                        // console.log(err, res)
 
                         this.$message({
                             type: err ? 'error' : 'success',
