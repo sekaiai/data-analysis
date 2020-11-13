@@ -364,7 +364,7 @@ export default {
                 items.push(_item)
             }
 
-            console.log('items', items)
+            console.log('items', items.length)
             // runSql2Arr(arr)
             setSLPGKID(items).then(pgk_ids => {
                 // console.log('runSql2Arr over', res)
@@ -374,29 +374,29 @@ export default {
                     title: '受理清单导入完成！',
                     message: '开始查找重复数据。'
                 })
-                deleteReplaceData().then(res => {
-                    // console.log('重复数据删除完成')
-                    this.btntext = '正在更新账期信息'
-                    this.onFetchMonthLength()
+                // deleteReplaceData().then(res => {
+                // console.log('重复数据删除完成')
+                this.btntext = '正在更新账期信息'
+                this.onFetchMonthLength()
 
-                    this.$notify.info({
+                /*             this.$notify.info({
+                    duration: 20000,
+                    title: '重复数据删除完成！',
+                    message: '开始更新账期信息。'
+                })*/
+                console.log('pgk_ids', pgk_ids)
+                // 开始更新账期
+                computedZhangqiState3(pgk_ids).then(res => {
+                    this.datas = []
+                    this.insertStatus = false
+                    this.btntext = '写入完成'
+                    this.$notify.success({
                         duration: 20000,
-                        title: '重复数据删除完成！',
-                        message: '开始更新账期信息。'
-                    })
-                    console.log('pgk_ids', pgk_ids)
-                    // 开始更新账期
-                    computedZhangqiState3(pgk_ids).then(res => {
-                        this.datas = []
-                        this.insertStatus = false
-                        this.btntext = '写入完成'
-                        this.$notify.success({
-                            duration: 20000,
-                            title: '完成',
-                            message: '账期更新完毕，所有操作结束！'
-                        })
+                        title: '完成',
+                        message: '账期更新完毕，所有操作结束！'
                     })
                 })
+                // })
             })
         }
     }

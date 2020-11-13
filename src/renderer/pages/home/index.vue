@@ -30,44 +30,45 @@
                     <el-table-column label="总清单">
                         <template slot-scope="scope"> {{ scope.row.count ? scope.row.count + '条' : '-' }}</template>
                     </el-table-column>
-                    <el-table-column label="已结算" >
+                    <el-table-column label="已结算">
                         <template slot-scope="scope">
                             {{ scope.row.success ? scope.row.success + '条' : '-' }}
                         </template>
                     </el-table-column>
-                    <el-table-column label="未结算" >
+                    <el-table-column label="未结算">
                         <template slot-scope="scope">{{ scope.row.none ? scope.row.none + '条' : '-' }}</template>
                     </el-table-column>
                 </el-table-column>
 
                 <el-table-column label="结算清单">
-                    <el-table-column prop="js_count" label="总计" >
+                    <el-table-column prop="js_count" label="总计">
                         <template slot-scope="scope">
                             {{ scope.row.js_count ? scope.row.js_count + '条' : '-' }}</template
                         >
                     </el-table-column>
                     <el-table-column prop="js_success" label="已结算">
-                        <template slot-scope="scope">
-                            {{ scope.row.js_success ? scope.row.js_success + '条' : '-' }}</template
-                        >
+                        <template slot-scope="scope">{{
+                            scope.row.js_success ? scope.row.js_success + '条' : '-'
+                        }}</template>
                     </el-table-column>
-                    <el-table-column prop="js_none" label="未结算"">
+
+                    <el-table-column prop="js_none" label="未结算">
                         <template slot-scope="scope">{{ scope.row.js_none ? scope.row.js_none + '条' : '-' }}</template>
                     </el-table-column>
                 </el-table-column>
 
                 <el-table-column label="积分清单">
-                    <el-table-column prop="jf_count" label="总计" >
+                    <el-table-column prop="jf_count" label="总计">
                         <template slot-scope="scope">
                             {{ scope.row.jf_count ? scope.row.jf_count + '条' : '-' }}</template
                         >
                     </el-table-column>
-                    <el-table-column prop="jf_success" label="已结算" >
+                    <el-table-column prop="jf_success" label="已结算">
                         <template slot-scope="scope">
                             {{ scope.row.jf_success ? scope.row.jf_success + '条' : '-' }}</template
                         >
                     </el-table-column>
-                    <el-table-column prop="jf_none" label="未结算" >
+                    <el-table-column prop="jf_none" label="未结算">
                         <template slot-scope="scope">{{ scope.row.jf_none ? scope.row.jf_none + '条' : '-' }}</template>
                     </el-table-column>
                 </el-table-column>
@@ -110,7 +111,7 @@
             </div>
 
             <el-table :data="jsLists" border style="width: 100% ;" max-height="280">
-                <el-table-column prop="date" label="账期" width="180"> </el-table-column>
+                <el-table-column prop="date" label="账期" width="100"> </el-table-column>
                 <el-table-column label="清单数">
                     <el-table-column prop="count" label="总计">
                         <template slot-scope="scope"> {{ (scope.row.success | 0) + (scope.row.fail | 0) }}条 </template>
@@ -541,17 +542,14 @@ export default {
             // 下载受理清单
             this.downSlListLoading = true
 
-            if(date === '总计'){
+            if (date === '总计') {
                 date = false
             }
 
-
             const sl = await importSLNoneJS(0, date)
-            console.log({sl})
+            console.log({ sl })
 
-            const datas = [
-                { bookName: '未结算的受理清单', datas: sl }
-            ]
+            const datas = [{ bookName: '未结算的受理清单', datas: sl }]
             // console.log(datas)
 
             download
@@ -567,8 +565,6 @@ export default {
                 .catch(err => {
                     console.log(err)
                 })
-
-
         },
         formatJFList(jf_list) {
             let suss = [],
@@ -687,7 +683,9 @@ export default {
         },
         fetchSlListsAll() {
             // 查找所有未结算的
-            const max = dayjs().add(1,'M').format('YYYYMM')
+            const max = dayjs()
+                .add(1, 'M')
+                .format('YYYYMM')
 
             return new Promise(resolve => {
                 const sql = [0, 1, -1]
@@ -757,7 +755,9 @@ export default {
             // console.log('fetchSlLists')
             // 账期  需结算 结算成功    结算失败    没有结算清单  积分清单    没有积分清单  操作
 
-            const max = dayjs().add(1,'M').format('YYYYMM')
+            const max = dayjs()
+                .add(1, 'M')
+                .format('YYYYMM')
             /*const min = dayjs()
                 .subtract(3, 'month')
                 .format('YYYYMM')*/
@@ -772,11 +772,11 @@ export default {
                 })
                 .join(' union all ')
 
-                // let sql = `select count(1) as count,date,state,type from zhangqi where date < ${max} and state=1 and type=1 group by date union all select count(1) as count,date,state,type from zhangqi where date < ${max} and state!=1 and type=2 group by date`
-console.log(sql)
+            // let sql = `select count(1) as count,date,state,type from zhangqi where date < ${max} and state=1 and type=1 group by date union all select count(1) as count,date,state,type from zhangqi where date < ${max} and state!=1 and type=2 group by date`
+            // console.log(sql)
             this.$db.all(sql, (err, res) => {
                 if (!res) return
-                const arr = {}
+                let arr = {}
                 res.forEach(e => {
                     if (!arr[e.date]) {
                         arr[e.date] = {
@@ -789,7 +789,7 @@ console.log(sql)
                             jf_success: 0,
                             js_count: 0,
                             js_none: 0,
-                            js_success: 0,
+                            js_success: 0
                         }
                     }
 
@@ -797,58 +797,59 @@ console.log(sql)
 
                     if (e.type == 1) {
                         arr[e.date].js_count += e.count
-                        if (e.state != 1) {
+                        if (e.state == 0) {
                             arr[e.date].none += e.count
                             arr[e.date].js_none += e.count
-                        }else {
+                        } else {
                             arr[e.date].success += e.count
                             arr[e.date].js_success += e.count
                         }
                     } else {
                         arr[e.date].jf_count += e.count
-                        if (e.state != 1) {
+                        if (e.state == 0) {
                             arr[e.date].none += e.count
                             arr[e.date].jf_none += e.count
-
                         } else {
                             arr[e.date].success += e.count
                             arr[e.date].jf_success += e.count
-
-
                         }
                     }
-
                 })
+                // console.log('Object.values(arr)',Object.values(arr))
 
-                let all = Object.values(arr).reduce((acc,cur) => {
-                    if(acc){
-                        let _cur = {...cur}
-                        _cur.date = '总计'
-                        _cur.jf_count+=acc.jf_count
-                        _cur.jf_none+=acc.jf_none
-                        _cur.jf_success+=acc.jf_success
-                        _cur.js_count+=acc.js_count
-                        _cur.js_none+=acc.js_none
-                        _cur.js_success+=acc.js_success
-                        _cur.none+=acc.none
-                        _cur.success+=acc.success
-                        _cur.count+=acc.count
-                        return _cur
-                    }else{
-                        return cur
-                    }
-                })
-               
-               let lists = Object.values(arr).sort((a, b) => b.date - a.date)
-               lists.unshift(all)
-                console.log('arr',all,lists)
-               this.slLists = lists
+                arr = Object.values(arr)
+                if (arr.length) {
+                    let all = Object.values(arr).reduce((acc, cur) => {
+                        if (acc) {
+                            let _cur = { ...cur }
+                            _cur.date = '总计'
+                            _cur.jf_count += acc.jf_count
+                            _cur.jf_none += acc.jf_none
+                            _cur.jf_success += acc.jf_success
+                            _cur.js_count += acc.js_count
+                            _cur.js_none += acc.js_none
+                            _cur.js_success += acc.js_success
+                            _cur.none += acc.none
+                            _cur.success += acc.success
+                            _cur.count += acc.count
+                            return _cur
+                        } else {
+                            return cur
+                        }
+                    })
 
+                    let lists = Object.values(arr).sort((a, b) => b.date - a.date)
+                    lists.unshift(all)
+                    console.log('arr', all, lists)
+                    this.slLists = lists
+                }
             })
         },
         // 获取积分清单
         fetchJfLists() {
-            const max = dayjs().add(1,'M').format('YYYYMM')
+            const max = dayjs()
+                .add(1, 'M')
+                .format('YYYYMM')
             /*const min = dayjs()
                 .subtract(5, 'month')
                 .format('YYYYMM')*/
@@ -878,7 +879,9 @@ console.log(sql)
         },
         // 获取结算清单的账单统计
         fetchJsLists() {
-            const max = dayjs().add(1,'M').format('YYYYMM')
+            const max = dayjs()
+                .add(1, 'M')
+                .format('YYYYMM')
             /*const min = dayjs()
                 .subtract(5, 'month')
                 .format('YYYYMM')*/

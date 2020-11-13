@@ -47,17 +47,12 @@
         </div>
         <div class="flex line2">
             <!-- 业务动作 -->
-            <!--   <div class="flex-item">
-                <div class="title">选择业务动作</div>
-                <el-select
-                    v-model="action"
-                    :remote-method="remoteMethod('action')"
-                    placeholder="选择业务动作"
-                    filterable
-                >
-                    <el-option :label="v" :value="v" v-for="(v, i) in actions" :key="i"></el-option>
+            <div class="flex-item">
+                <div class="title">是否关联套餐</div>
+                <el-select v-model="inpgk" placeholder="是否关联套餐" filterable>
+                    <el-option :label="v.v" :value="v.i" v-for="(v, i) in inpgkArr" :key="i"></el-option>
                 </el-select>
-            </div> -->
+            </div>
             <!-- 业务号码 -->
             <div class="flex-item">
                 <div class="title">业务号码</div>
@@ -204,6 +199,11 @@ export default {
             analysisActiveName: 'all',
             fileList: [],
             datas: [],
+            inpgk: '',
+            inpgkArr: [
+                { i: 1, v: '已关联' },
+                { i: 0, v: '未关联' }
+            ],
             pickerOptions: {
                 shortcuts: [
                     {
@@ -430,7 +430,15 @@ export default {
             if (this.action_no !== '') {
                 where.push(`action_no like '%${this.action_no}%' or user_number like '%${this.action_no}%'`)
             }
-
+            if (this.inpgk !== '') {
+                if (this.inpgk) {
+                    // 已关联结算清单
+                    where.push(`pgk_id!=0`)
+                } else {
+                    // 未关联 结算清单
+                    where.push(`pgk_id=0`)
+                }
+            }
             if (where.length > 0) {
                 where = where.join(' and ')
                 where = `where ${where}`
@@ -450,6 +458,7 @@ export default {
                 this.product_main = '' //所属主销售品
                 this.action = ''
                 this.product_name = ''
+                this.pgk_id = ''
             } else {
                 where = this.onParseSearchSQL()
             }

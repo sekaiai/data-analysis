@@ -15,6 +15,12 @@
                 </el-select>
             </div>
             <div class="flex-item">
+                <div class="title">是否关联套餐</div>
+                <el-select v-model="inpgk" placeholder="是否关联套餐" filterable>
+                    <el-option :label="v.v" :value="v.i" v-for="(v, i) in inpgkArr" :key="i"></el-option>
+                </el-select>
+            </div>
+            <div class="flex-item">
                 <div class="title">用户ID</div>
                 <el-input v-model="user_id" placeholder="可输入部分" />
             </div>
@@ -30,6 +36,12 @@
             </div>
         </div>
         <div class="flex">
+            <div class="flex-item">
+                <div class="title">清单结算状态</div>
+                <el-select v-model="flag" placeholder="状态" filterable>
+                    <el-option :label="v.v" :value="v.i" v-for="(v, i) in flag_arr" :key="i"></el-option>
+                </el-select>
+            </div>
             <div class="flex-item">
                 <div class="title">销售实例ID</div>
                 <el-input v-model="xs_instance_id" placeholder="可输入部分" />
@@ -139,6 +151,10 @@
                             </el-form>
                         </template>
                     </el-table-column>
+                    <el-table-column prop="flag" label="清单结算状态">
+                        <template slot-scope="scope"> {{ scope.row.flag > 0 ? '已结算' : '未结算' }} </template>
+                    </el-table-column>
+
                     <el-table-column v-for="(v, i) in columns" :key="i" :prop="i" :label="v"> </el-table-column>
                     <!-- <el-table-column prop="no" label="购物车流水号"> </el-table-column> -->
                 </el-table>
@@ -168,6 +184,16 @@ export default {
     name: 'jlist',
     data() {
         return {
+            flag: '',
+            flag_arr: [
+                { i: 1, v: '已结算' },
+                { i: 0, v: '未结算' }
+            ],
+            inpgk: '',
+            inpgkArr: [
+                { i: 1, v: '已关联' },
+                { i: 0, v: '未关联' }
+            ],
             outputLoading: false, //导出中
             datas: [],
             total: 0,
@@ -188,6 +214,7 @@ export default {
                 user_number: '用户号码',
                 package_name: '入网套餐',
                 md_name: '门店名称',
+                flag: '结算状态',
                 xs_name: '销售人员',
                 jf_jiesuan: '结算积分'
                 // acno: '是否有受理清单'
@@ -257,12 +284,13 @@ export default {
         handleOutputDatas() {
             this.outputLoading = true
             let where = this.onParseSearchSQL()
-            const sql = `select b.*,a.acceptor,a.user,a.action_no as acno from jifen j left join accept a on (a.user_number=b.user_number or a.action_no=b.user_number) where ${where}`
+            const sql = `select b.*,a.acceptor,a.user,a.action_no as acno from jifen b left join accept a on (a.user_number=b.user_number or a.action_no=b.user_number) where ${where}`
             this.$db.all(sql, (err, res = []) => {
                 this.$logger({ res, sql })
                 // this.datas = res
                 if (res && res.length > 0) {
                     let json = {
+                        flag: '结算状态',
                         date: '账期',
                         local: '本地网',
                         company: '县公司',
@@ -332,6 +360,8 @@ export default {
                         if (/UNIQUE/i.test(v[k])) {
                             return '数据已存在'
                         }
+                    } else if (k === 'flag') {
+                        return v[k] > 0 ? '已结算' : '未结算'
                     }
                     return v[k]
                 })
@@ -366,6 +396,11 @@ export default {
                     .unix()
                 where.push(`b.created between ${a} and ${b}`)
             }
+
+            if (this.flag !== '') {
+                where.push(`b.flag='${this.flag}'`)
+            }
+
             if (this.not_found_user && this.not_found_user !== '') {
                 where.push(`b.not_found_user = 1`)
             }
@@ -378,6 +413,15 @@ export default {
             }
             if (this.order_id !== '') {
                 where.push(`b.order_id like '%${this.order_id}%'`)
+            }
+            if (this.inpgk !== '') {
+                if (this.inpgk) {
+                    // 已关联结算清单
+                    where.push(`b.pgk_id!=0`)
+                } else {
+                    // 未关联 结算清单
+                    where.push(`b.pgk_id=0`)
+                }
             }
 
             // 查询开始结束
@@ -426,6 +470,7 @@ export default {
                 this.package_name = ''
                 this.user_number = ''
                 this.order_id = ''
+                this.pgk_id = ''
             }
             this.page = 1
 

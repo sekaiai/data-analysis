@@ -15,6 +15,12 @@
                 </el-select>
             </div>
             <div class="flex-item">
+                <div class="title">是否关联套餐</div>
+                <el-select v-model="inpgk" placeholder="是否关联套餐" filterable>
+                    <el-option :label="v.v" :value="v.i" v-for="(v, i) in inpgkArr" :key="i"></el-option>
+                </el-select>
+            </div>
+            <div class="flex-item">
                 <div class="title">清单结算状态</div>
                 <el-select v-model="flag" placeholder="状态" filterable>
                     <el-option :label="v.v" :value="v.i" v-for="(v, i) in flag_arr" :key="i"></el-option>
@@ -169,6 +175,11 @@ export default {
             flag_arr: [
                 { i: 1, v: '已结算' },
                 { i: 0, v: '未结算' }
+            ],
+            inpgk: '',
+            inpgkArr: [
+                { i: 1, v: '已关联' },
+                { i: 0, v: '未关联' }
             ],
             date: '', //账期
             created: '', //创建时间
@@ -339,6 +350,15 @@ export default {
             if (this.flag !== '') {
                 where.push(`b.flag='${this.flag}'`)
             }
+            if (this.inpgk !== '') {
+                if (this.inpgk) {
+                    // 已关联结算清单
+                    where.push(`b.pgk_id!=0`)
+                } else {
+                    // 未关联 结算清单
+                    where.push(`b.pgk_id=0`)
+                }
+            }
             if (this.date && this.date !== '') {
                 let a = dayjs(this.date).format('YYYYMM')
                 where.push(`b.date = ${a}`)
@@ -414,6 +434,7 @@ export default {
                 this.package_name = ''
                 this.user_number = ''
                 this.order_id = ''
+                this.pgk_id = ''
             }
             this.page = 1
 
