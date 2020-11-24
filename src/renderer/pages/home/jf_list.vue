@@ -471,6 +471,8 @@ export default {
                 this.user_number = ''
                 this.order_id = ''
                 this.pgk_id = ''
+                this.inpgk = ''
+                this.flag = ''
             }
             this.page = 1
 

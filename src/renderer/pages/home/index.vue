@@ -840,7 +840,7 @@ export default {
 
                     let lists = Object.values(arr).sort((a, b) => b.date - a.date)
                     lists.unshift(all)
-                    console.log('arr', all, lists)
+                    // console.log('arr', all, lists)
                     this.slLists = lists
                 }
             })
@@ -854,12 +854,12 @@ export default {
                 .subtract(5, 'month')
                 .format('YYYYMM')*/
             const sql = `select count(1) as count,date,flag,sum(ydjf) as ydjf,sum(qs) as qs from jifen where date < ${max} and flag=1  group by date union all select count(1) as count,date,flag,sum(ydjf) as ydjf,sum(qs) as qs from jifen where date < ${max} and flag<>1 group by date`
-            console.log(sql)
+            // console.log(sql)
             this.$db.all(sql, (err, res) => {
                 if (res) {
                     const arr = {}
                     res.forEach(e => {
-                        console.log(e)
+                        // console.log(e)
                         if (!arr[e.date]) {
                             arr[e.date] = { date: e.date }
                         }
@@ -887,7 +887,7 @@ export default {
                 .format('YYYYMM')*/
             let where = `date < ${max}`
             const sql = `select count(1) as count,date,flag,sum(commission_money) as money from bill where ${where} and flag=1 group by date union all select count(1) as count,date,flag,sum(commission_money) as money  from bill where ${where} and flag<>1 group by date`
-            console.log(sql)
+            // console.log(sql)
             this.$db.all(sql, (err, res) => {
                 if (res) {
                     const arr = {}

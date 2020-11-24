@@ -14,7 +14,7 @@
             </el-tag>
         </div>
         <div class="title-line">
-            套餐管理<el-button @click="isShowAddTaocan = true" style="margin-left: 10px;" type="text" size="mini">
+            套餐管理<el-button @click="openAddTaocan" style="margin-left: 10px;" type="text" size="mini">
                 添加规则
             </el-button>
             <el-button @click="importTaocan" style="margin-left: 10px;" type="text" size="mini">
@@ -128,7 +128,7 @@
         >
             <el-form :model="ruleForm" :rules="rules" ref="ruleForm" class="demo-ruleForm">
                 <el-form-item prop="type" label="套餐结算类型">
-                    <el-radio-group v-model="ruleForm['type']">
+                    <el-radio-group v-model="ruleForm['type']" @change="typeChange">
                         <el-radio :label="1">普通结算</el-radio>
                         <el-radio :label="2">积分结算</el-radio>
                     </el-radio-group>
@@ -166,6 +166,7 @@
 
                 <div class="title-line">账期条件</div>
 
+                <p>相同条件只能有一个</p>
                 <el-form-item
                     label="结算次数"
                     v-for="(domain, index) in ruleForm.rules"
@@ -193,7 +194,7 @@
                 </el-form-item>
 
                 <div class="title-line">结算条件</div>
-                <p>默认条件：结算套餐名称=受理套餐名称，结算用户号码=受理用户号码</p>
+                <p>相同条件只能有一个。默认条件：结算套餐名称=受理套餐名称、结算用户号码=受理用户号码</p>
 
                 <el-form-item
                     v-for="(domain, index) in ruleForm.js_rules"
@@ -343,7 +344,7 @@ export default {
     },
     watch: {
         'ruleForm.type'(v) {
-            this.$set(this.ruleForm, 'js_rules', [])
+            // console.log(v)
         }
     },
     computed: {
@@ -361,6 +362,9 @@ export default {
         }
     },
     methods: {
+        typeChange(v) {
+            this.$set(this.ruleForm, 'js_rules', [])
+        },
         computedZhangqiState2,
         removeDomain(item, js) {
             let rules = js ? this.ruleForm.js_rules : this.ruleForm.rules
@@ -451,34 +455,37 @@ export default {
                         v = String(v).replace(/，/, ',')
                     } else if (k === 'js_rules' || k === 'rules') {
                         let _v = []
-                        v.split('||').forEach(e2 => {
-                            // ["a=b", "a", "=", "b", index: 0, input: "a=b"]
-                            // [{ k: 'action', c: '=', v: '新装' }]
-                            // acceptKeys
-                            let _type = e['结算类型']
-                            let x2 = e2.match(/(.+)(=|>|<|!)(.+)/)
-                            let acc = {}
-                            if (k === 'rules') {
-                                var obj = this.acceptKeys
-                                for (let x in obj) {
-                                    acc[obj[x]] = x
-                                }
-                            } else {
-                                var obj = {}
-                                if (_type == 1) {
-                                    obj = this.jsKeys
+                        if (v) {
+                            v.split('||').forEach(e2 => {
+                                // ["a=b", "a", "=", "b", index: 0, input: "a=b"]
+                                // [{ k: 'action', c: '=', v: '新装' }]
+                                // acceptKeys
+                                let _type = e['结算类型']
+                                let x2 = e2.match(/(.+)(=|>|<|!)(.+)/)
+                                let acc = {}
+                                if (k === 'rules') {
+                                    var obj = this.acceptKeys
+                                    for (let x in obj) {
+                                        acc[obj[x]] = x
+                                    }
                                 } else {
-                                    obj = this.jfKeys
+                                    var obj = {}
+                                    if (_type == 1) {
+                                        obj = this.jsKeys
+                                    } else {
+                                        obj = this.jfKeys
+                                    }
+                                    for (let x in obj) {
+                                        acc[obj[x]] = x
+                                    }
                                 }
-                                for (let x in obj) {
-                                    acc[obj[x]] = x
+                                // console.log(acc[x2[1]], x2[1], acc)
+                                if (x2 && x2[3]) {
+                                    _v.push({ k: acc[x2[1]], c: x2[2], v: x2[3] })
                                 }
-                            }
-                            // console.log(acc[x2[1]], x2[1], acc)
-                            if (x2 && x2[3]) {
-                                _v.push({ k: acc[x2[1]], c: x2[2], v: x2[3] })
-                            }
-                        })
+                            })
+                        }
+
                         v = _v
                         // console.log('---------------', v)
                     }
@@ -579,6 +586,7 @@ export default {
             }
         },
         openAddTaocan(v) {
+            v = typeof v === 'string' ? v : ''
             // 从tag添加套餐
             this.ruleForm = {
                 type: 1,
@@ -586,7 +594,7 @@ export default {
                 rules: [{ k: 'action', c: '=', v: '新装' }],
                 // 结算规则
                 js_rules: [],
-                name: v, //名称
+                name: v || '', //名称
                 count: 1, //结算次数
                 law: '1', //结算规律
                 desc: '' //规律说明
@@ -611,8 +619,13 @@ export default {
         editTaocan(datas) {
             // 修改套餐
             this.isedit = datas.id
+            datas.fuka = datas.fuka | 0
 
-            this.ruleForm = { ...datas, rules: JSON.parse(datas.rules), js_rules: JSON.parse(datas.js_rules) }
+            this.ruleForm = {
+                ...datas,
+                rules: JSON.parse(datas.rules),
+                js_rules: JSON.parse(datas.js_rules)
+            }
             this.isShowAddTaocan = true
         },
         fetchDatas() {
@@ -641,7 +654,9 @@ export default {
             })
         },
         addTaocan() {
-            const data = this.ruleForm
+            const data = { ...this.ruleForm }
+            delete data.wjs
+            delete data.yjs
             const id = this.isedit
             this.addTaocan2(data, id)
         },

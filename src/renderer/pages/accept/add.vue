@@ -330,7 +330,7 @@ export default {
             for (var i = this.datas.length - 1; i >= 0; i--) {
                 let item = this.datas[i]
                 let uuid = uuidv4()
-                let _item = {}
+                let _item = { pgk_id: 0 }
 
                 for (let x in this.items) {
                     let e = this.items[x]
@@ -364,7 +364,7 @@ export default {
                 items.push(_item)
             }
 
-            console.log('items', items.length)
+            console.log('items', items[0])
             // runSql2Arr(arr)
             setSLPGKID(items).then(pgk_ids => {
                 // console.log('runSql2Arr over', res)
@@ -384,7 +384,7 @@ export default {
                     title: '重复数据删除完成！',
                     message: '开始更新账期信息。'
                 })*/
-                console.log('pgk_ids', pgk_ids)
+                // console.log('pgk_ids', pgk_ids)
                 // 开始更新账期
                 computedZhangqiState3(pgk_ids).then(res => {
                     this.datas = []

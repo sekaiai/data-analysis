@@ -70,6 +70,10 @@ const computedZhangqiState3 = async pgk_id => {
                     // console.log('00000000000000', zq.fuka, e.user_number, zq.fuka.indexOf(e.user_number))
                     return `#${zq.fuka}#`.indexOf(e.user_number) > -1
                 })
+
+                if (idx === -1) {
+                    continue
+                }
                 let [data] = jsList.splice(idx, 1)
 
                 // console.log('datadatadatadatadata', data)
@@ -1248,21 +1252,49 @@ const importJSNoneSL = (pgk_id, type, date) => {
 
         DB.all(sql, pgk_id, (err, res) => {
             // console.log(sql, res)
-            let notfoundItems = {
-                date: '账期',
-                order_id: '订单号',
-                complete_date: '订单竣工时间',
-                commission_policy: '佣金结算策略',
-                commission_type: '佣金结算类型',
-                commission_money: '佣金结算金额（元）',
-                package_name: '发展套餐名',
-                product_name: '产品类型',
-                user_id: '用户ID',
-                user_number: '用户号码',
-                status: '是否成功结算',
-                cause: '原因',
-                branch: '网点名称'
-            }
+            let notfoundItems =
+                type == 1
+                    ? {
+                          date: '账期',
+                          order_id: '订单号',
+                          complete_date: '订单竣工时间',
+                          commission_policy: '佣金结算策略',
+                          commission_type: '佣金结算类型',
+                          commission_money: '佣金结算金额（元）',
+                          package_name: '发展套餐名',
+                          product_name: '产品类型',
+                          user_id: '用户ID',
+                          user_number: '用户号码',
+                          status: '是否成功结算',
+                          cause: '原因',
+                          branch: '网点名称'
+                      }
+                    : {
+                          date: '账期',
+                          local: '本地网',
+                          company: '县公司',
+                          jf_type: '积分类型',
+                          jf_name: '积分规则名称',
+                          event_name: '活动名称',
+                          xs_id: '销售人员工号',
+                          xs_name: '销售人员',
+                          md_id: '门店工号',
+                          md_code: '门店编码',
+                          md_name: '门店名称',
+                          cp_type: '产品名称',
+                          user_id: '用户ID',
+                          user_number: '用户号码',
+                          xs_instance_id: '销售品实例ID',
+                          package_name: '入网套餐',
+                          rw_date: '入网时间',
+                          hyjh: '合约计划',
+                          jf_jiesuan: '结算积分',
+                          bqdh: '本期兑换',
+                          qs: '清算',
+                          ydjf: '应兑换积分',
+                          acceptor: '受理人',
+                          user: '揽收人'
+                      }
 
             const datas = parseAoaData(res, notfoundItems)
             reslove(datas)
@@ -1348,9 +1380,9 @@ const setPGKID = async (items, type) => {
                 // console.log('获取到对应的套餐了')
                 pgkIds.add(taocan.id)
                 item.pgk_id = taocan.id
-                sqlArr.push(insertJifenSQL(item, type))
             }
         }
+        sqlArr.push(insertJifenSQL(item, type))
     }
     await runSql2Arr(sqlArr)
     return Array.from(pgkIds)
@@ -1358,10 +1390,14 @@ const setPGKID = async (items, type) => {
 
 const insertJifenSQL = (datas, type) => {
     // console.log({ type })
+    if (!datas.pgk_id) {
+        datas.pgk_id = 0
+    }
     let keys = Object.keys(datas).join(',')
     let values = Object.values(datas).join(`','`)
     // 插入数据库
     const sql = `insert into ${type} (${keys}) values ('${values}')`
+    // console.log(sql)
     return sql
 }
 
@@ -1379,13 +1415,14 @@ const setSLPGKID = async (items, type) => {
                 let taocan = taocanArr[t]
                 if (taocan.val.indexOf(`#${item.product_main}#`) > -1 && jstcjs(item, taocan.rules)) {
                     item.pgk_id = taocan.id
+                    let sqlZQ = await createZhangqiSQL(taocan, item)
+                    sqlArr.push(...sqlZQ)
+                    pgkIds.add(taocan.id)
                 }
-                let sqlZQ = await createZhangqiSQL(taocan, item)
-                sqlArr.push(...sqlZQ)
-                sqlArr.push(insertJifenSQL(item, 'accept'))
-                pgkIds.add(taocan.id)
             }
+            sqlArr.push(insertJifenSQL(item, 'accept'))
         }
+        // console.log('sqlArr', sqlArr)
         await runSql2Arr(sqlArr)
         // return Array.from(pgkIds)
         return reslove(Array.from(pgkIds))
