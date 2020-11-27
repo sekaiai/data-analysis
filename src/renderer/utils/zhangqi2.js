@@ -20,6 +20,21 @@ const updateAllData = async () => {
     // 4. 更新账期
 }
 
+const parseFuka = zq => {
+    let fuka = new Set()
+    zq.forEach(e => {
+        e.fuka
+            .split('#')
+            .filter(v => v)
+            .forEach(e2 => {
+                fuka.add(e2)
+            })
+    })
+    // console.log('fukalen', fuka.size)
+    fuka = `'${Array.from(fuka).join("','")}'`
+    return fuka
+}
+
 const computedZhangqiState3 = async pgk_id => {
     // console.log(5, '开始生成账期', pgk_id)
     let pgk = typeof pgk_id
@@ -53,22 +68,52 @@ const computedZhangqiState3 = async pgk_id => {
 
             // 获取所有与套餐相关的结算清单或积分清单
             // 因为每个套餐ID对应一个结算规则，所以取第一个判断是积分结算还是常规结算
-            let jsSQL = ''
-            if (zqList[0].type === 1) {
-                jsSQL = `select * from bill jf where jf.flag <>1 and jf.pgk_id ${pgk}`
-            } else {
-                jsSQL = `select * from jifen jf  where jf.flag <>1 and jf.pgk_id ${pgk}`
-            }
-            let jsList = await sqlAll(jsSQL)
+            let _jsList = ''
+            let _jfList = ''
+            let jsList = ''
 
-            // console.log('zqList', zqList, jsList)
+            // console.log(22222222222222222222222, zqList[0], pgk_id)
+            let fukas = parseFuka(zqList)
+            // console.log(fukas)
+
+            /*         if (zqList[0].type === 1) {
+                // jsSQL = `select * from bill jf where jf.flag <>1 and jf.pgk_id ${pgk}`
+                jsSQL = `select * from bill jf where jf.user_number in (${fukas})`
+            } else {
+                // jsSQL = `select * from jifen jf  where jf.flag <>1 and jf.pgk_id ${pgk}`
+                jsSQL = `select * from jifen jf where jf.user_number in (${fukas})`
+            }*/
+            // let jsList = await sqlAll(jsSQL)
+            //
+            let flagArr = 0
+
             for (let i = 0; i < zqList.length; i++) {
                 let zq = zqList[i]
-                // zq.rules = JSON.parse(zq.rules)
+                if (zq.type === 1) {
+                    if (!_jsList) {
+                        let _sql = `select * from bill jf where jf.user_number in (${fukas}) and jf.flag <> 1`
+                        _jsList = await sqlAll(_sql)
+                        // console.log(_jsList.length)
+                    }
 
+                    jsList = _jsList
+                } else {
+                    if (!_jfList) {
+                        let _sql = `select * from jifen jf where jf.user_number in (${fukas}) and jf.flag <> 1`
+                        _jfList = await sqlAll(_sql)
+                    }
+
+                    jsList = _jfList
+                }
+                // zq.rules = JSON.parse(zq.rules)
+                // console.log('zqList', zq.type, pgk_id, zqList.length, jsList.length)
                 let idx = jsList.findIndex(e => {
                     // console.log('00000000000000', zq.fuka, e.user_number, zq.fuka.indexOf(e.user_number))
-                    return `#${zq.fuka}#`.indexOf(e.user_number) > -1
+                    let flag = `#${zq.fuka}#`.indexOf(String(e.user_number)) > -1
+                    if (flag) {
+                        flagArr++
+                    }
+                    return flag
                 })
 
                 if (idx === -1) {
@@ -87,20 +132,24 @@ const computedZhangqiState3 = async pgk_id => {
                         }
 
                         let upzq = `update zhangqi set state=${state},qd_id='${data.id}' where id='${zq.id}'`
-                        let upbl = `update bill set flag=1 where id='${data.id}'`
+                        let upbl = `update bill set flag=1,pgk_id='${zq.pgk_id}' where id='${data.id}'`
                         // console.log(upzq, upbl)
                         sqlArr.push(upzq, upbl)
                     } else {
                         // 积分结算
 
                         // 该条数据符合要求
-                        let state = data.ydjf > 0 ? 1 : -1
+                        // let state = data.bqdh > 0 ? 1 : -1
+                        let state = 1
                         let upzq = `update zhangqi set state=${state},qd_id='${data.id}' where id='${zq.id}'`
-                        let upbl = `update jifen set flag=1 where id='${data.id}'`
+                        let upbl = `update jifen set flag=1,pgk_id='${zq.pgk_id}' where id='${data.id}'`
                         sqlArr.push(upzq, upbl)
                     }
+                } else {
+                    console.log('奇怪的现象', data)
                 }
             }
+            // console.log(flagArr, sqlArr.length, pgk_id)
 
             sqlArr.map(e => runSql(e))
             Promise.all(sqlArr).then(res => {
@@ -219,7 +268,7 @@ const computedZhangqiState2 = async (pgk_id, type) => {
                         let { id } = perf[i]
 
                         for (let j = 0; j < fake.length; j++) {
-                            console.log(id, fake[j].id)
+                            // console.log(id, fake[j].id)
                             if (id === fake[j].id) {
                                 fake.splice(j, 1)
                             }
@@ -775,8 +824,8 @@ const deleteZhangqi2accept = apts => {
 
         // 1. 先更新清单flag,再删除账期
         const upSQL = [
-            `UPDATE jifen SET flag=0 where id in ( SELECT qd_id FROM zhangqi zq WHERE zq.list_id in(${ids}) and zq.qd_id is not null )`,
-            `UPDATE bill SET flag=0 where id in ( SELECT qd_id FROM zhangqi zq WHERE zq.list_id in(${ids}) and zq.qd_id is not null )`
+            `UPDATE jifen SET flag=0,pgk_id=0 where id in ( SELECT qd_id FROM zhangqi zq WHERE zq.list_id in(${ids}) and zq.qd_id is not null )`,
+            `UPDATE bill SET flag=0,pgk_id=0 where id in ( SELECT qd_id FROM zhangqi zq WHERE zq.list_id in(${ids}) and zq.qd_id is not null )`
         ]
 
         await new Promise(reslove => {
@@ -935,11 +984,11 @@ const TCupdateZQ = async (id, isedit = false) => {
     }
 
     // 添加套餐ID, 返回账期sql列表
-    let sqlArr = await addPgkid(taocan, ['bill', 'accept', 'jifen'])
-
+    // await addPgkid(taocan, ['bill', 'accept', 'jifen'])
+    await addPgkid(taocan, ['accept'])
+    // return
     // 添加账期
-    await insertZhangqi233(sqlArr)
-
+    // await insertZhangqi233(sqlArr)
     // 更新账期
     const zq = await computedZhangqiState3(pgk_id)
     return zq
@@ -1029,8 +1078,10 @@ const addPgkid = async (taocan = {}, types = []) => {
                             // console.log(5.1, '开始创建账期', taocan.id)
                             let zq = await createZhangqiSQL(taocan, list[i2])
                             // console.log(5.1, '创建账期结束', zq)
-
-                            zhangqiArr.push(...zq)
+                            for (let zqi = 0; zqi < zq.length; zqi++) {
+                                sqlArr.push(runSql(zq[zqi]))
+                            }
+                            // zhangqiArr.push(...zq)
                             // sqlArr.push(runSql(createZhangqiSQL(taocan, list[i])))
                             let _sql = `update accept set pgk_id='${id}' where uuid='${list[i2].uuid}'`
                             sqlArr.push(runSql(_sql))
@@ -1047,7 +1098,9 @@ const addPgkid = async (taocan = {}, types = []) => {
 
             Promise.all(sqlArr).then(res => {
                 DB.run('COMMIT TRANSACTION;')
-                reslove(zhangqiArr)
+                reslove()
+                // setTimeout(() => {
+                // }, 1000)
             })
         })
     })
@@ -1366,8 +1419,11 @@ const getAllFuka = () => {
 const setPGKID = async (items, type) => {
     let pgkIds = new Set()
     let sqlArr = []
+    let typeInt = type === 'jifen' ? 2 : 1
     // 1. 获取所有套餐，
-    const taocanArr = await getAllTaocan()
+    let taocanArr = await getAllTaocan()
+    taocanArr = taocanArr.filter(e => e.type == typeInt)
+    console.log(taocanArr)
     // 3. 更新当前清单
     for (var i = 0; i < items.length; i++) {
         let item = items[i]
@@ -1375,7 +1431,9 @@ const setPGKID = async (items, type) => {
         // let taocans = taocanArr.filter(e => e.name === item.package_name)
         for (var t = 0; t < taocanArr.length; t++) {
             let taocan = taocanArr[t]
+            // console.log(taocan.type, typeInt, taocan.type == typeInt)
             // console.log('获取套餐了', taocan.val.indexOf(`#${item.package_name}#`) > -1, taocan.val, item.package_name)
+            // taocan.type == typeInt &&
             if (taocan.val.indexOf(`#${item.package_name}#`) > -1 && jstcjs(item, taocan.js_rules)) {
                 // console.log('获取到对应的套餐了')
                 pgkIds.add(taocan.id)
@@ -1424,6 +1482,8 @@ const setSLPGKID = async (items, type) => {
         }
         // console.log('sqlArr', sqlArr)
         await runSql2Arr(sqlArr)
+        // return reslove()
+
         // return Array.from(pgkIds)
         return reslove(Array.from(pgkIds))
     })

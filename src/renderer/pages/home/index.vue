@@ -152,10 +152,10 @@
             <el-table :data="jfLists" border style="width: 100%" max-height="280">
                 <el-table-column prop="date" label="账期" width="180"> </el-table-column>
                 <el-table-column prop="success_count" label="已结算">
-                    <template slot-scope="scope"> {{ scope.row.success_count }}条 </template>
+                    <template slot-scope="scope"> {{ scope.row.success_count || 0 }}条 </template>
                 </el-table-column>
                 <el-table-column prop="fail_count" label="未结算">
-                    <template slot-scope="scope"> {{ scope.row.fail_count }}条 </template>
+                    <template slot-scope="scope"> {{ scope.row.fail_count || 0 }}条 </template>
                 </el-table-column>
                 <el-table-column label="积分">
                     <el-table-column prop="success_ydjf" label="已结算"> </el-table-column>
@@ -765,7 +765,7 @@ export default {
                 .map(e => {
                     return [1, 2]
                         .map(e2 => {
-                            let state = e ? `state=1` : `state!=1`
+                            let state = e ? `state=0` : `state!=0`
                             return `select count(*) as count,date,state,type from zhangqi where date < ${max} and ${state} and type=${e2} group by date`
                         })
                         .join(' union all ')
@@ -777,7 +777,9 @@ export default {
             this.$db.all(sql, (err, res) => {
                 if (!res) return
                 let arr = {}
-                res.forEach(e => {
+                for (let xi = 0; xi < res.length; xi++) {
+                    let e = res[xi]
+
                     if (!arr[e.date]) {
                         arr[e.date] = {
                             count: 0,
@@ -795,9 +797,9 @@ export default {
 
                     arr[e.date].count += e.count
 
-                    if (e.type == 1) {
+                    if (e.type === 1) {
                         arr[e.date].js_count += e.count
-                        if (e.state == 0) {
+                        if (e.state === 0) {
                             arr[e.date].none += e.count
                             arr[e.date].js_none += e.count
                         } else {
@@ -806,7 +808,7 @@ export default {
                         }
                     } else {
                         arr[e.date].jf_count += e.count
-                        if (e.state == 0) {
+                        if (e.state === 0) {
                             arr[e.date].none += e.count
                             arr[e.date].jf_none += e.count
                         } else {
@@ -814,8 +816,8 @@ export default {
                             arr[e.date].jf_success += e.count
                         }
                     }
-                })
-                // console.log('Object.values(arr)',Object.values(arr))
+                }
+                // console.log('Object.values(arr)', Object.values(arr))
 
                 arr = Object.values(arr)
                 if (arr.length) {

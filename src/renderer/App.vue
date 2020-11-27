@@ -40,9 +40,10 @@
         <!-- <el-scrollbar class='main'> -->
         <!-- <div > -->
         <el-scrollbar noresize class="continer flex1">
-            <!-- <keep-alive exclude="bill,blist,jlist"> -->
-            <router-view class="main flex1 flex-column flex"></router-view>
-            <!-- </keep-alive> -->
+            <!-- exclude="bill,blist,jlist" -->
+            <keep-alive exclude="bill">
+                <router-view class="main flex1 flex-column flex"></router-view>
+            </keep-alive>
         </el-scrollbar>
 
         <!-- </div> -->

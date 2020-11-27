@@ -366,7 +366,7 @@ export default {
 
             console.log('items', items[0])
             // runSql2Arr(arr)
-            setSLPGKID(items).then(pgk_ids => {
+            setSLPGKID(items).then(async pgk_ids => {
                 // console.log('runSql2Arr over', res)
                 this.btntext = '正在查找重复数据'
                 this.$notify.info({
@@ -384,9 +384,24 @@ export default {
                     title: '重复数据删除完成！',
                     message: '开始更新账期信息。'
                 })*/
-                // console.log('pgk_ids', pgk_ids)
+                console.log('pgk_ids', pgk_ids)
+                // return
                 // 开始更新账期
-                computedZhangqiState3(pgk_ids).then(res => {
+                let arr = []
+                for (var i = 0; i < pgk_ids.length; i++) {
+                    await computedZhangqiState3(pgk_ids[i])
+                }
+
+                this.datas = []
+                this.insertStatus = false
+                this.btntext = '写入完成'
+                this.$notify.success({
+                    duration: 20000,
+                    title: '完成',
+                    message: '账期更新完毕，所有操作结束！'
+                })
+
+                /*computedZhangqiState3(pgk_ids).then(res => {
                     this.datas = []
                     this.insertStatus = false
                     this.btntext = '写入完成'
@@ -395,7 +410,7 @@ export default {
                         title: '完成',
                         message: '账期更新完毕，所有操作结束！'
                     })
-                })
+                })*/
                 // })
             })
         }

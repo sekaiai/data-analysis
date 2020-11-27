@@ -190,6 +190,7 @@ const fs = require('fs')
 const { readFileSync } = fs
 
 export default {
+    name: 'index',
     data() {
         return {
             deleteLoading: false, //删除数据

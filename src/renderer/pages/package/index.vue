@@ -126,7 +126,7 @@
             "
             @close="isedit = 0"
         >
-            <el-form :model="ruleForm" :rules="rules" ref="ruleForm" class="demo-ruleForm">
+            <el-form :model="ruleForm" :rules="rules" ref="ruleForm" class="demo-ruleForm" v-loading="loading">
                 <el-form-item prop="type" label="套餐结算类型">
                     <el-radio-group v-model="ruleForm['type']" @change="typeChange">
                         <el-radio :label="1">普通结算</el-radio>
@@ -658,6 +658,7 @@ export default {
             delete data.wjs
             delete data.yjs
             const id = this.isedit
+            this.loading = true
             this.addTaocan2(data, id)
         },
         addTaocan2(__datas, __ID) {
@@ -711,7 +712,6 @@ __action = { k: 'action', c: '=', v: '改速率' }
                     // console.log(sql, keys)
                 }
                 console.log(1, '开始拆入套餐')
-                this.loading = true
                 this.$db.run(sql, async (err, res) => {
                     if (err) {
                         console.error('addTaocan', err)

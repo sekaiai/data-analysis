@@ -49,6 +49,7 @@
                 <div class="title">选择账期</div>
                 <el-date-picker v-model="zhangqiDate" type="month" placeholder="选择账期"> </el-date-picker>
             </div>
+
             <div class="flex-item">
                 <div class="title">操作</div>
                 <el-button @click="handleSearch" type="primary">查询</el-button>
@@ -480,7 +481,12 @@ export default {
             }
 
             if (this.product_name !== '') {
+                console.log('this.product_name', this.product_name)
                 where.push(`a.product_name='${this.product_name}'`)
+            }
+            if (this.product_main !== '') {
+                console.log('this.product_main', this.product_main)
+                where.push(`a.product_main='${this.product_main}'`)
             }
 
             if (this.zq_types !== '') {
@@ -505,11 +511,12 @@ export default {
                 this.status = ''
                 this.zhangqiDate = ''
                 this.product_name = ''
-                this.product_mains = ''
+                this.product_main = ''
                 this.action_no = ''
             } else {
                 where = this.onParseSearchSQL()
             }
+            console.log(where)
             this.onFetchCount(where)
             this.onFetchDatas(where)
         },
